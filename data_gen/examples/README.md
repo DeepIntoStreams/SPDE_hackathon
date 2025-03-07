@@ -31,3 +31,14 @@ $$
 with the initial condition $u_0$ either being fixed across samples ($u_0=x(1-x)$, for example), or varying.
 
 We sample multiple paths $\xi^1, \ldots, \xi^n$ from a Q-Wiener process in one dimension, and then solve the SPDE (using the spectral Galerkin method).
+
+## Data generation for the stochastic wave equation
+
+In `gen_wave.py` we generate solutions of the stochastic wave equations,
+
+$$
+(\partial^2_t - \Delta) u = cos(\pi\, u) + u^2 + u\cdot\xi\,\quad\text{for $(t,x) \in [0,1]\times [0,1]$,}\\
+u(t,0) = u(t,1)\quad\\
+u(0,x) = \sin(2\pi\,x)\\
+\partial_t u(0,x) = x(1-x).
+$$
