@@ -2,10 +2,9 @@ import numpy as np
 import scipy.io
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-import sys
-sys.path.append('..')
-from src.Noise import Noise
-from src.general_solver import smooth_corr, general_1d_solver
+
+from data_gen.src.Noise import Noise
+from data_gen.src.general_solver import smooth_corr, general_1d_solver
 
 n = 1200 # number of solutions
 Nx, Nt = 2**7, 10**2  # number of observations in space and time
