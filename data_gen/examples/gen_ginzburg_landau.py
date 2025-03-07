@@ -3,16 +3,21 @@ import numpy as np
 import scipy.io
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-import sys
-sys.path.append('..')
-from src.Noise import Noise
-from src.SPDEs import SPDE
+
+from data_gen.src.Noise import Noise
+from data_gen.src.SPDEs import SPDE
 
 n = 1200 # number of solutions
 dx, dt = 1./128, 1./1000 # space-time increments
 a, b, s, t = 0, 1, 0, 0.05 # space-time boundaries
 
-ic = lambda x: x*(1-x) # initial condition
+ic = lambda x: x*(1-x) # initial condition (fixed)
+
+# Another kind of initial condition (varying)
+# X_ = np.linspace(-0.5,0.5,129)
+# ic_ = Noise().initial(n, X_, scaling = 1) # one cycle
+# ic = 0.1*(ic_-ic_[:,0,None]) + ic(O_X)
+
 mu = lambda x: 3*x-x**3 # drift
 sigma = lambda x: 1 # additive diffusive term
 
