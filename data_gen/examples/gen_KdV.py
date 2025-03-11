@@ -1,6 +1,12 @@
+import os
+import os.path as osp
+import sys
+
+current_directory = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(osp.join(current_directory, "..",".."))
+
 import numpy as np
 import scipy.io
-import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 from data_gen.src.Noise import Noise
@@ -30,7 +36,7 @@ soln = KdV.transpose(0,2,1)
 
 O_X, O_T = np.linspace(0,1,W.shape[-2]), np.linspace(0,1,W.shape[-1])
 
-save_dir = 'results/data_kdv/'
+save_dir = 'data_gen/results/data_kdv/'
 os.makedirs(save_dir, exist_ok=True)
-scipy.io.savemat('results/data_kdv/kdv_xi_{}.mat'.format(n), mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
+scipy.io.savemat('data_gen/results/data_kdv/kdv_xi_{}.mat'.format(n), mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
 

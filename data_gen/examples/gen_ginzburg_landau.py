@@ -1,5 +1,11 @@
-import scipy.io
 import os
+import os.path as osp
+import sys
+
+current_directory = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(osp.join(current_directory, "..",".."))
+
+import scipy.io
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 from data_gen.src.Noise import Noise
@@ -26,6 +32,6 @@ Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic(0.1*W, O_T,
 W = W.transpose(0,2,1)
 soln = Soln_add.transpose(0,2,1)
 
-save_dir = 'results/Phi41+/'
+save_dir = 'data_gen/results/Phi41+/'
 os.makedirs(save_dir, exist_ok=True)
-scipy.io.savemat('results/Phi41+/Phi41+_xi_{}.mat'.format(n), mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
+scipy.io.savemat('data_gen/results/Phi41+/Phi41+_xi_{}.mat'.format(n), mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
