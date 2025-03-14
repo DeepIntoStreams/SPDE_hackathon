@@ -11,7 +11,7 @@ from timeit import default_timer
 
 import warnings
 import torch.optim as optim
-from utilities import *
+from model.nspde.utilities import *
 warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,7 +36,8 @@ tex_fonts = {
 plt.rcParams.update(tex_fonts)"""
 
 # Load data set.
-data = scipy.io.loadmat('E:/Doc/SignatureAndML/code/SPDE_hackathon/data_gen/results/Phi41+/Phi41+_xi_{}.mat'.format(1200))
+# data = scipy.io.loadmat('/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/Phi41+/Phi41+_xi_{}.mat'.format(1200))
+data = scipy.io.loadmat('/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/data_kdv/kdv_xi_{}.mat'.format(1200))
 
 # The data has been saved in the following format
 
@@ -67,7 +68,8 @@ model, losses_train, losses_test = train_nspde(model, train_loader, test_loader,
                                                   learning_rate=0.025, scheduler_step=100, 
                                                   scheduler_gamma=0.5, print_every=5)
 
-torch.save(model.state_dict(), '../drive/MyDrive/data_phi41+/nspde_u0_xi_1200.pth')
+# torch.save(model.state_dict(), '/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/Phi41+/nspde_u0_xi_1200.pth')
+torch.save(model.state_dict(), '/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/data_kdv/nspde_xi_1200.pth')
 
 plt.plot(np.arange(1,len(losses_train)*5, 5), losses_train, label='train')
 plt.plot(np.arange(1,len(losses_test)*5, 5), losses_test, label='test')
