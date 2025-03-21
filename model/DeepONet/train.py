@@ -24,10 +24,13 @@ data = torch.from_numpy(Sol.astype(np.float32))
 
 train_loader, test_loader, normalizer, grid = dataloader_deeponet_1d_xi(data, xi, ntrain=1000, ntest=200,
                                                             T=51, sub_t=1, batch_size=20,
-                                                            dim_x=128, normalizer=False,
+                                                            dim_x=128, normalizer=True,
                                                             dataset=None)
 
-model = DeepONetCP(branch_layer=[128] + [300, 200],
+# model = DeepONetCP(branch_layer=[128] + [300, 200],
+#                     trunk_layer=[2] + [100, 200, 200]).to(device)
+
+model = DeepONetCP(branch_layer=[6400] + [300, 200],
                     trunk_layer=[2] + [100, 200, 200]).to(device)
 
 print('The model has {} parameters'. format(count_params(model)))
@@ -36,7 +39,7 @@ loss = LpLoss(size_average=False)
 
 model, losses_train, losses_test = train_deepOnet_1d(model, train_loader, test_loader, grid,
                                                     normalizer, device, loss, batch_size=20,
-                                                    epochs=500, learning_rate=0.001,
+                                                    epochs=5000, learning_rate=0.001,
                                                     scheduler_step=100, scheduler_gamma=0.5,
                                                     print_every=1)
 

@@ -27,7 +27,7 @@ sigma = lambda x: 1 # additive diffusive term
 
 O_X, O_T = Noise().partition(a,b,dx), Noise().partition(s,t,dt) # space grid O_X and time grid O_T
 W = Noise().WN_space_time_many(s, t, dt, a, b, dx, n) # create realizations of space time white noise
-Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic(0.1*W, O_T, O_X) # solve parabolic equation
+
 
 W = W.transpose(0,2,1)
 soln = Soln_add.transpose(0,2,1)
@@ -35,3 +35,4 @@ soln = Soln_add.transpose(0,2,1)
 save_dir = 'data_gen/results/Phi41+/'
 os.makedirs(save_dir, exist_ok=True)
 scipy.io.savemat('data_gen/results/Phi41+/Phi41+_xi_{}.mat'.format(n), mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
+Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic(0.1*W, O_T, O_X) # solve parabolic equation

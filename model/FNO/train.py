@@ -25,7 +25,7 @@ train_loader, test_loader = dataloader_fno_1d_xi(u=data, xi=xi, ntrain=1000,
                                                  ntest=200, T=51, sub_t=1, batch_size=20,
                                                  dim_x=128, dataset='phi41')
 
-model = FNO_space1D_time(modes1=32, modes2=24, width=32, T=1, L=4).cuda()
+model = FNO_space1D_time(modes1=32, modes2=24, width=32, T=51, L=4).cuda()
 
 print('The model has {} parameters'. format(count_params(model)))
 
