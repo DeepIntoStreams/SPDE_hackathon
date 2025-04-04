@@ -1,0 +1,12 @@
+sim:
+  a: 0
+  b: 1.0
+  Nx: 128
+  s: 0
+  t: 0.05
+  Nt: 50
+  num: 1200
+
+seed: 42
+
+save_dir: 'results/Phi41+/'

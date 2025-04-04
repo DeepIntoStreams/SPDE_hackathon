@@ -1,0 +1,12 @@
+sim:
+  a: 0
+  b: 1.0
+  Nx: 100
+  s: 0
+  t: 1.0
+  Nt: 1000
+  num: 1000
+
+seed: 42
+
+save_dir: 'results/data_wave/'

@@ -1,0 +1,25 @@
+# Viscosity parameter
+nu: 1e-4
+
+# GRF
+alpha: 3
+tau: 3
+
+# Stochastic forcing function: sigma*dW/dt
+stochastic_forcing: {'alpha': 0.005, 'kappa': 10, 'sigma': 0.05}
+
+# Spatial Resolution
+s: 64
+
+# Temporal Resolution
+T: 15
+delta_t: 1e-3
+
+# Number of solutions to generate
+N: 100
+
+# Batch size (Solve equations in batches)
+bsize: 10
+
+
+seed: 42

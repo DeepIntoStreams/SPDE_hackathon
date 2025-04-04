@@ -2,27 +2,24 @@ import numpy as np
 import pandas as pd
 import math
 from tqdm import tqdm
-from time import time
-import seaborn as sns
 import torch
 
+def partition(a, b, dx):  # makes a partition of [a,b] of equal sizes dx
+    return np.linspace(a, b, int((b - a) / dx) + 1)
 
-class Noise(object):
-
-    def partition(self, a, b, dx):  # makes a partition of [a,b] of equal sizes dx
-        return np.linspace(a, b, int((b - a) / dx) + 1)
+class Noise():
 
     # Create l dimensional Brownian motion with time step = dt
 
     def BM(self, start, stop, dt, l):
-        T = self.partition(start, stop, dt)
+        T = partition(start, stop, dt)
         # assign to each point of len(T) time point an N(0, \sqrt(dt)) standard l dimensional random variable
         BM = np.random.normal(scale=np.sqrt(dt), size=(len(T), l))
         BM[0] = 0  # set the initial value to 0
         BM = np.cumsum(BM, axis=0)  # cumulative sum: B_n = \sum_1^n N(0, \sqrt(dt))
         return BM
 
-    # Create space time noise. White in time and with some correlation in space.
+    # Create space-time noise. White in time and with some correlation in space.
     # See Example 10.31 in "AN INTRODUCTION TO COMPUTATIONAL STOCHASTIC PDES" by Lord, Powell, Shardlow
     # X here is points in space as in SPDE1 function.
     def WN_space_time_single(self, s, t, dt, a, b, dx, correlation=None, numpy=True):
@@ -31,7 +28,7 @@ class Noise(object):
         if correlation is None:
             correlation = self.WN_corr
 
-        T, X = self.partition(s, t, dt), self.partition(a, b, dx)  # time points, space points,
+        T, X = partition(s, t, dt), partition(a, b, dx)  # time points, space points,
         N = len(X)
         # Create correlation Matrix in space
         space_corr = np.array([[correlation(x, j, dx * (N - 1)) for j in range(N)] for x in X])
@@ -43,7 +40,6 @@ class Noise(object):
         return pd.DataFrame(np.dot(B, space_corr), index=T, columns=X)
 
     def WN_space_time_many(self, s, t, dt, a, b, dx, num, correlation=None):
-
         return np.array([self.WN_space_time_single(s, t, dt, a, b, dx, correlation=correlation) for _ in range(num)])
 
     # Funciton for creating N random initial conditions of the form
@@ -70,17 +66,6 @@ class Noise(object):
     # See Example 10.31 in "AN INTRODUCTION TO COMPUTATIONAL STOCHASTIC PDES" by Lord, Powell, Shardlow
     def WN_corr(self, x, j, a):
         return np.sqrt(2 / a) * np.sin(j * np.pi * x / a)
-
-    # save list of noises as a multilevel dataframe csv file
-    def save(self, W, name):
-        W.to_csv(name)
-
-    def upload(self, name):
-        Data = pd.read_csv(name, index_col=0, header=[0, 1])
-        Data.columns = pd.MultiIndex.from_product([['W' + str(i + 1) for i in range(Data.columns.levshape[0])],
-                                                   np.asarray(Data['W1'].columns, dtype=np.float16)])
-
-        return Data
 
 
 class GaussianRF(object):

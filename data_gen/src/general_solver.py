@@ -1,6 +1,4 @@
 import numpy as np
-from time import time
-from tqdm.notebook import tqdm
 
 
 # smooth Q noise as in Example 10.8 of `An Introduction to Computational Stochastic PDEs' by Lord, Powell & Shardlow
@@ -75,7 +73,7 @@ def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=
 
     w = np.fft.fft(u0, axis=-1)
 
-    for i in tqdm(range(1, N + 1)):
+    for i in range(1, N + 1):
 
         Extra_nonlinearity = 0
         if Burgers != 0 or KPZ != 0:  # if Burgers or KPZ is present compute space derivative. M/X = (dx)^{-1}
