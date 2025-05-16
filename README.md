@@ -36,12 +36,14 @@ python gen_phi42.py fix_u0=False eps=128
 
 Settings of the equation can be tailored by choose different values for config args.
 
-- `fix_u0`: `True`--fix initial condition; `False`--vary initial condition among samples.
 - `a`,`b`,`Nx` (and `c`,`d`,`Ny` in 2D case): begin point, end point, space resolution.
 - `s`,`t`,`Nt`: start time, end time, time resolution.
 - `truncation`: truncation degree of noise.
 - `sigma`:
+- `fix_u0`: `True`--fix initial condition; `False`--vary initial condition among samples.
 - `num`: number of samples generated.
+- `save_dir`:
+- `save_name`
 
 (More details about the config args will be added later.)
 
@@ -203,12 +205,12 @@ SPDE_hackathon
 ## Acknowledgements 
 This project incorporates code from the following open-source repositories:
 
-[Feature Engineering with Regularity Structures](https://github.com/andrisger/Feature-Engineering-with-Regularity-Structures)
+- [Feature Engineering with Regularity Structures](https://github.com/andrisger/Feature-Engineering-with-Regularity-Structures).
 
-[Fourier Neural Operator](https://github.com/li-Pingan/fourier-neural-operator)
+- [Fourier Neural Operator](https://github.com/li-Pingan/fourier-neural-operator). Licensed under the MIT license.
 
-[Neural-SPDEs](https://github.com/crispitagorico/torchspde)
+- [Neural-SPDEs](https://github.com/crispitagorico/torchspde). Licensed under the Apache-2.0 license.
 
-[DLR-Net](https://github.com/sdogsq/DLR-Net)
+- [DLR-Net](https://github.com/sdogsq/DLR-Net).
 
 Many thanks to their authors for sharing these valuable contributions!
