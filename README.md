@@ -61,23 +61,23 @@ python train1d.py
 ### Brief introduction to key config args in models
 
 - `task`: `xi` (or `u0xi` if applicable)
-- `data_path`:
-- `dim_x`:
-- `T`:
-- `sub_t`:
-- `ntrain`,`nval`,`ntest`:
-- `num_workers`:
-- `epochs`:
-- `batch_size`:
-- `learning_rate`:
-- `scheduler_step`
-- `scheduler_gamma`
-- `plateau_patience`:
+- `data_path`: Directory where the datasets are saved.
+- `dim_x`: Dimension of the space variable.
+- `T`: Total number of time steps (i.e. time sequence length).
+- `sub_t`: Subsampling interval. Use all time steps in data if sub_t=1, or sample every sub_t steps to reduce data density.
+- `ntrain`,`nval`,`ntest`: Number of samples in the training, validation, and test sets.
+- `num_workers`: 
+- `epochs`: Total number of training epochs.
+- `batch_size`: Number of samples per batch.
+- `learning_rate`: Initial learning rate.
+- `scheduler_step`: Interval (in epochs) for learning rate adjustment.
+- `scheduler_gamma`: Learning rate decay factor. At each adjustment, the learning rate is multiplied by this value.
+- `plateau_patience`: 
 - `plateau_patience`
-- `delta`
-- `print_every`
-- `base_dir`: directory where output files will be saved.
-- `checkpoint_file`
+- `delta`: Minimum threshold forimprovement.
+- `print_every`: Training log frequency.
+- `base_dir`: Directory where output files (i.e. checkpoints) will be saved.
+- `checkpoint_file`: File name of model checkpoints (.pth).
 
 #### NCDE specific args:
 
