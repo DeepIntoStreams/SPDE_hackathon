@@ -10,7 +10,10 @@ sim:
   Nt: 250  
   num: 1200 # number of solutions
   eps: 128 # truncation degree of noise
+  sigma: 0.1  # coefficient of additive diffusive term
+  fix_u0: ${fix_u0}  # [True,False] True--fix; False--vary
 
 seed: 42
 
-save_dir: 'results/Phi42+/'
+save_dir: '../results/Phi42+/'
+save_name: 'Phi41+'

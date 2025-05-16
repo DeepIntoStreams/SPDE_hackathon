@@ -5,10 +5,11 @@ sim:
   s: 0
   t: 0.5
   Nt: 500
-  truncation: ${truncation}  # --multirun sim.truncation=32,64,128,256
-  fixed_u0: ${fixed_u0}  # sim.fixed_u0=True,False
+  truncation: ${truncation}  # [32,64,128,256]
+  fix_u0: ${fix_u0}  # [True,False] True--fix; False--vary
   num: 1200
 
 seed: 42
 
 save_dir: 'results/wave/'
+save_name: 'wave'

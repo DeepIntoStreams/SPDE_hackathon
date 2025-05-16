@@ -1,9 +1,9 @@
+# Adapted from https://github.com/andrisger/Feature-Engineering-with-Regularity-Structures
+# Modified for current implementation by the authors of SPDEBench
+
 import numpy as np
 import pandas as pd
-import math
 from tqdm import tqdm
-from time import time
-import matplotlib.pyplot as plt
 
 
 class SPDE():

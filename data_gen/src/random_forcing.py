@@ -1,4 +1,9 @@
-#TODO: Some of the functions below are dupplicated in Wiener.py. Merge the two
+# Portions of this code adapted from https://github.com/crispitagorico/torchspde
+#  (originally from https://github.com/andrisger/Feature-Engineering-with-Regularity-Structures)
+# Additional implementations and modifications by the authors of SPDEBench
+#  to generate trajectories of Q-Wiener process with different truncation degree
+
+
 import torch
 import torch.nn.functional as F
 import math
@@ -37,12 +42,6 @@ def get_twod_dW(bj,kappa,M,device):
     dW2 = torch.imag(tmp)
     return dW1,dW2
 
-def batch_interpolated_2d_idft(Y):
-    batch, H, W = Y.shape
-    Y_padded = F.pad(Y, (0, W, 0, H))  # (left, right, top, bottom)
-    X_padded = torch.fft.ifft2(Y_padded)
-    X_interpolated = X_padded * 4  # 1/(4HW) -> 1/HW
-    return X_interpolated
 
 def process_tensor(x, dim, J=32, N=64):
     """
@@ -90,7 +89,6 @@ def process_tensor(x, dim, J=32, N=64):
         result = result.permute(0, 2, 1)  # Transpose back to original dimensions
 
     return result
-
 
 def get_twod_dW_revised(bj, kappa, M, device):
     """

@@ -1,14 +1,9 @@
+# Adapted from https://github.com/crispitagorico/torchspde
+# Modified for current implementation by the authors of SPDEBench
+
 import numpy as np
+from tqdm import tqdm
 
-
-# smooth Q noise as in Example 10.8 of `An Introduction to Computational Stochastic PDEs' by Lord, Powell & Shardlow
-def smooth_corr(x, j, a, r=0):
-    def q(j):
-        if j == 0:
-            return 0
-        return (j // 2 + 1) ** (-r)
-
-    return np.sqrt(q(j)) * np.sqrt(2 / a) * np.sin(j * np.pi * x / a)
 
 def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=0, compl=False, D=None):
     # L = [c_0, ... c_3, c_4] corresponds to a differential operator L = \sum c_i \partial^i_x
@@ -73,7 +68,7 @@ def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=
 
     w = np.fft.fft(u0, axis=-1)
 
-    for i in range(1, N + 1):
+    for i in tqdm(range(1, N + 1)):
 
         Extra_nonlinearity = 0
         if Burgers != 0 or KPZ != 0:  # if Burgers or KPZ is present compute space derivative. M/X = (dx)^{-1}

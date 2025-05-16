@@ -1,3 +1,6 @@
+# Portions of this code adapted from https://github.com/crispitagorico/torchspde
+# Modified for current implementation by the authors of SPDEBench
+
 import hydra
 from omegaconf import DictConfig
 import scipy.io
@@ -7,15 +10,22 @@ import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..",".."))
-from data_gen.src.Noise import Noise, partition
-from data_gen.src.general_solver import smooth_corr, general_1d_solver
+from data_gen.src.Noise import Noise
+from data_gen.src.general_solver import general_1d_solver
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+# smooth Q noise as in Example 10.8 of `An Introduction to Computational Stochastic PDEs' by Lord, Powell & Shardlow
+def smooth_corr(x, j, a, r):
+    def q(j):
+        if j == 0:
+            return 0
+        return (j // 2 + 1) ** (-r)
+
+    return np.sqrt(q(j)) * np.sqrt(2 / a) * np.sin(j * np.pi * x / a)
 
 def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
-    O_X, O_T = partition(a,b,dx), partition(s,t,dt) # space grid O_X and time grid O_T
+    O_X, O_T = Noise().partition(a,b,dx), Noise().partition(s,t,dt) # space grid O_X and time grid O_T
 
     u0 = np.array([[np.sin(2*np.pi*x) for x in np.linspace(a, b, Nx + 1)[:-1]] for _ in range(num)])  # initial condition
     if not fix_u0:  # varying initial condition
@@ -34,6 +44,9 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
         W_smooth = W_smooth[:, ::10, :]
     elif noise_type == 'Q':
         W_smooth = Noise().WN_space_time_many(s, t, dt, a, b, dx, num, J=truncation)
+    else:
+        print('Invalid noise type!')
+        exit(0)
 
     # L_kdv = [0, 0, 1e-3, -0.1, 0]
     L_kdv = [0, 0, 0, -0.1, 0]

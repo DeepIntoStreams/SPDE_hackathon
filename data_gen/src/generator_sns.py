@@ -1,3 +1,7 @@
+# Adapted from https://github.com/crispitagorico/torchspde
+#  (originally from https://github.com/zongyi-li/fourier_neural_operator)
+# Modified for current implementation by the authors of SPDEBench
+
 # TODO: make it compatible with torch version
 # adapted from https://github.com/zongyi-li/fourier_neural_operator.
 # on top of the deterministic forcing with give the possibility to add a random noise which is a Wiener process
@@ -5,18 +9,11 @@
 # An Introduction to Computational Stochastic PDEs
 
 import torch
-
 import math
+from tqdm import tqdm
+from data_gen.src.random_forcing import get_twod_bj, get_twod_dW, get_twod_dW_revised
 
-import matplotlib.pyplot as plt
-import matplotlib
-from tqdm.notebook import tqdm
 
-from data_gen.src.random_forcing import GaussianRF, get_twod_bj, get_twod_dW, get_twod_dW_revised
-
-from timeit import default_timer
-
-import scipy.io
 
 
 # a: domain where we are solving

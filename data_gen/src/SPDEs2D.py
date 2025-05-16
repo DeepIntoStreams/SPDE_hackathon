@@ -1,10 +1,5 @@
 import numpy as np
-import pandas as pd
-import math
 from tqdm import tqdm
-from time import time
-import matplotlib.pyplot as plt
-from scipy.fftpack import dst, idst
 
 
 class SPDE2D():

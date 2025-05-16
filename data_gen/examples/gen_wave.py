@@ -7,18 +7,16 @@ import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..",".."))
-from data_gen.src.Noise import Noise, partition
+from data_gen.src.Noise import Noise
 from data_gen.src.SPDEs import SPDE
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-
-def simulator(a, b, Nx, s, t, Nt, truncation, fixed_u0, num):
+def simulator(a, b, Nx, s, t, Nt, truncation, fix_u0, num):
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
-    O_X, O_T = partition(a,b,dx), partition(s,t,dt) # space grid O_X and time grid O_T
+    O_X, O_T = Noise().partition(a,b,dx), Noise().partition(s,t,dt) # space grid O_X and time grid O_T
 
     ic = lambda x: np.sin(2 * np.pi * x)  # initial condition (fixed part)
-    if not fixed_u0:  # varying initial condition
+    if not fix_u0:  # varying initial condition
         X_ = np.linspace(-0.5,0.5,Nx+1)
         ic_ = Noise().initial(num, X_, scaling = 1)
         ic = (ic_-ic_[:,0,None]) + ic(O_X)
@@ -42,10 +40,10 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     O_X, O_T, W, soln = simulator(**cfg.sim)
     os.makedirs(cfg.save_dir, exist_ok=True)
-    if cfg.sim.fixed_u0:
-        filename = 'wave_xi_trc{}.mat'.format(cfg.sim.truncation)
+    if cfg.sim.fix_u0:
+        filename = '{}_xi_trc{}.mat'.format(cfg.save_name, cfg.sim.truncation)
     else:
-        filename = 'wave_u0_xi_trc{}.mat'.format(cfg.sim.truncation)
+        filename = '{}_u0_xi_trc{}.mat'.format(cfg.save_name, cfg.sim.truncation)
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X':O_X, 'T':O_T[::5], 'W': W[:,:,::5], 'sol': soln[:,:,::5]})
     print("Saved to", cfg.save_dir + filename)
 
