@@ -1,0 +1,39 @@
+model: DLR  #确认
+equation: NS
+#task: ${task}  # xi/u0xi
+data_type: u0xi #${data_type}  # xi/u0xi/xi/u0_xi
+truncation: ${truncation}  # [32,64,128,256]
+load_cp: False #'../../u0_xi_trc64_run-joab8cp8.pth'
+
+wandb:
+  entity: "SPDE_hackathon"  #确认
+  project: "${model}_${equation}"  #确认
+#  name: "${data_type}_trc${truncation}"
+  name: "${data_type}_trc${truncation}_newData"
+
+fixed:
+  data:
+    data_path: '../../data_gen/NS_${data_type}_nu4_trc${truncation}_DLR/merged_ns_trc${truncation}.mat'
+#    data_path: '../../download_NS/NS_${data_type}.mat'
+    sub_x: 4
+    T: 100
+    sub_t: 1
+  model:
+    height: 2
+    nu: 1e-4
+  train:
+    ntrain: 1000
+#    nval: 0
+    ntest: 200
+    batch_size: 64
+    epochs: 1000 #500,1000
+    learning_rate: 1e-2
+    weight_decay: 1e-5
+    print_every: 50
+    seed: 3407  #确认
+    sche: 'cos'
+#    delta: 0
+#    plateau_terminate: 100
+    checkpoint_file: '${data_type}_trc${truncation}'  #确认
+  save:
+    base_dir: '../result/${model}_${equation}'  #确认

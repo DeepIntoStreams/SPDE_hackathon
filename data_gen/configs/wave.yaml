@@ -1,0 +1,14 @@
+sim:
+  a: 0
+  b: 1.0
+  Nx: 128
+  s: 0
+  t: 0.5
+  Nt: 500
+  truncation: ${truncation}  # --multirun sim.truncation=32,64,128,256
+  fixed_u0: ${fixed_u0}  # sim.fixed_u0=True,False
+  num: 1200
+
+seed: 42
+
+save_dir: 'results/wave/'

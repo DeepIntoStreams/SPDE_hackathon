@@ -1,0 +1,53 @@
+model: NCDE-FNO  #确认
+equation: Phi41+1  #确认
+#task: ${task}  # xi/u0xi  #确认
+data_type: ${data_type}  # xi/u0_xi  #确认
+truncation: ${truncation}  # [32,64,128,256]  #确认
+
+wandb:
+  entity: "SPDE_hackathon"  #确认
+  project: "${model}_${equation}"  #确认
+  name: "${data_type}_trc${truncation}"  #确认
+
+#sweep:
+#  program: train_wb.py
+#  name: "${data_type}_trc${truncation}"
+#  method: grid
+#  metric:
+#    name: loss_val
+#    goal: minimize
+#  parameters:
+#    hidden_channels:
+#      values: [8, 16, 32]
+#    solver:
+#      values: ['euler', 'rk4']
+
+fixed:
+  data:
+    data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'  #确认
+    dim_x: 128  #确认
+    T: 51  #确认
+    sub_t: 1  #确认
+  model:
+    data_size: 1  #确认
+    noise_size: 1  #确认
+    hidden_channels: 16  #确认
+    output_channels: 1  #确认
+    solver: 'rk4'  #确认
+  train:
+    ntrain: 840  #确认
+    nval: 180  #确认
+    ntest: 180  #确认
+    interpolation: 'linear'  #确认
+    batch_size: 20  #确认
+    epochs: 1000  #确认
+    learning_rate: 0.001  #确认
+    delta: 0.0001  #确认
+    print_every: 50  #确认
+    seed: 3407  #确认
+#    plateau_patience: 20  #确认
+    factor: 0.5
+    plateau_terminate: 50  #确认
+    checkpoint_file: '${data_type}_trc${truncation}'  #确认
+  save:
+    base_dir: '../result/${model}_${equation}'  #确认

@@ -1,0 +1,54 @@
+model: NSPDE
+equation: wave
+task: u0xi  # u0/xi/u0xi
+data_type: u0_xi  # u0_xi/xi/u0_xi
+truncation: ${truncation}  # [32,64,128,256]
+
+wandb:
+  entity: "SPDE_hackathon"
+  project: "${model}_${equation}"
+  name: "${task}_trc${truncation}"
+
+sweep:
+  program: train1d_wb.py
+  name: "${task}_trc${truncation}"
+  method: grid
+  metric:
+    name: loss_val
+    goal: minimize
+  parameters:
+    hidden_channels:
+      values: [ 32 ]
+    n_iter:
+        values: [1, 2, 3, 4]
+    modes1:
+        values: [32, 64]
+    modes2:
+        values: [32, 50]
+
+fixed:
+  data:
+    data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'
+    dim_x: 128
+    T: 101
+    sub_t: 1
+  tune_param:
+    ntrain: 800
+    nval: 200
+    ntest: 200
+    batch_size: 20
+    plateau_patience: 50
+    plateau_terminate: 100
+    checkpoint_file: '${task}_trc${truncation}'
+  model:
+    dim: 1
+    in_channels: 1
+    noise_channels: 1
+    epochs: 1000
+    learning_rate: 0.0025
+    weight_decay: 1e-4
+    delta: 0.0002
+    print_every: 100
+    seed: 3407
+  save:
+    base_dir: '../result/${model}_${equation}'
