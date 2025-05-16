@@ -1,1 +1,6 @@
-
+numpy
+scipy
+torchcde==0.2.5
+torch
+signatory
+scikit-learn
