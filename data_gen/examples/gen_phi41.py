@@ -41,11 +41,9 @@ def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num):
 @hydra.main(version_base=None, config_path="../configs/", config_name="phi41")
 def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
-    O_X, O_T, W, Soln_add = simulator(**cfg)
-    if cfg.fix_u0:
-        filename = '{}_xi_trc{}.mat'.format(cfg.save_name, cfg.truncation)
-    else:
-        filename = '{}_u0_xi_trc{}.mat'.format(cfg.save_name, cfg.truncation)
+    O_X, O_T, W, Soln_add = simulator(**cfg.sim)
+
+    filename = f'{cfg.save_name}_{'xi' if cfg.fix_u0 else 'u0_xi'}_trc{cfg.truncation}.mat'
 
     os.makedirs(cfg.save_dir, exist_ok=True)
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X': O_X, 'T': O_T, 'W': W, 'sol': Soln_add})

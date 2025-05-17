@@ -66,10 +66,9 @@ def main(cfg: DictConfig):
     O_X, O_T, W, soln = simulator(**cfg.sim)
 
     os.makedirs(cfg.save_dir, exist_ok=True)
-    if cfg.sim.fix_u0:
-        filename = 'KdV_xi_trc{}.mat'.format(cfg.sim.truncation)
-    else:
-        filename = 'KdV_u0_xi_trc{}.mat'.format(cfg.sim.truncation)
+
+    filename = f'{cfg.save_name}_{'xi' if cfg.fix_u0 else 'u0_xi'}_trc{cfg.sim.truncation}.mat'
+
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
     print("Saved to", cfg.save_dir + filename)
 

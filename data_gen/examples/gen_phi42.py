@@ -41,17 +41,12 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     O_X, O_Y, O_T, W, eps, soln_reno, soln_expl = solver(**cfg.sim)
 
-    if cfg.fix_u0:
-        reno_filename = '{}_reno_xi_eps{}_{}.mat'.format(cfg.save_name, cfg.sim.eps, cfg.sim.num)
-        expl_filename = '{}_expl_xi_eps{}_{}.mat'.format(cfg.save_name, cfg.sim.eps, cfg.sim.num)
-    else:
-        reno_filename = '{}_reno_xi_u0_eps{}_{}.mat'.format(cfg.save_name, cfg.sim.eps, cfg.sim.num)
-        expl_filename = '{}_expl_xi_u0_eps{}_{}.mat'.format(cfg.save_name, cfg.sim.eps, cfg.sim.num)
     os.makedirs(cfg.save_dir, exist_ok=True)
-
+    reno_filename = f'{cfg.save_name}_reno_{'xi' if cfg.fix_u0 else 'xi_u0'}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
     scipy.io.savemat(cfg.save_dir + reno_filename, mdict={'X':O_X, 'Y':O_Y, 'T':O_T, 'W': W, 'eps':eps, 'sol': soln_reno})
     print("Saved to", cfg.save_dir + reno_filename)
 
+    expl_filename = f'{cfg.save_name}_expl_{'xi' if cfg.fix_u0 else 'xi_u0'}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
     scipy.io.savemat(cfg.save_dir + expl_filename, mdict={'X':O_X, 'Y':O_Y, 'T':O_T, 'W': W, 'eps':eps, 'sol': soln_expl})
     print("Saved to", cfg.save_dir + expl_filename)
 

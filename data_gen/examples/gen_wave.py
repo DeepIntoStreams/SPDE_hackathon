@@ -40,10 +40,7 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     O_X, O_T, W, soln = simulator(**cfg.sim)
     os.makedirs(cfg.save_dir, exist_ok=True)
-    if cfg.sim.fix_u0:
-        filename = '{}_xi_trc{}.mat'.format(cfg.save_name, cfg.sim.truncation)
-    else:
-        filename = '{}_u0_xi_trc{}.mat'.format(cfg.save_name, cfg.sim.truncation)
+    filename = f'{cfg.save_name}_{'xi' if cfg.fix_u0 else 'u0_xi'}_trc{cfg.truncation}.mat'
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X':O_X, 'T':O_T[::5], 'W': W[:,:,::5], 'sol': soln[:,:,::5]})
     print("Saved to", cfg.save_dir + filename)
 
