@@ -1,4 +1,5 @@
-# adapted from https://github.com/patrick-kidger/NeuralCDE
+# Adapted from https://github.com/crispitagorico/torchspde
+#  (originally from https://github.com/patrick-kidger/NeuralCDE)
 
 import torch
 import csv

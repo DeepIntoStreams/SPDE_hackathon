@@ -206,11 +206,11 @@ SPDE_hackathon
 This project incorporates code from the following open-source repositories:
 
 - [Feature Engineering with Regularity Structures](https://github.com/andrisger/Feature-Engineering-with-Regularity-Structures).
-
+- [NeuralCDE](https://github.com/patrick-kidger/NeuralCDE). Licensed under the Apache-2.0 license.
 - [Fourier Neural Operator](https://github.com/li-Pingan/fourier-neural-operator). Licensed under the MIT license.
-
+- [torchcde](https://github.com/patrick-kidger/torchcde.git). Licensed under the Apache-2.0 license.
+- [DEQ](https://github.com/locuslab/deq.git). Licensed under the MIT license.
 - [Neural-SPDEs](https://github.com/crispitagorico/torchspde). Licensed under the Apache-2.0 license.
-
 - [DLR-Net](https://github.com/sdogsq/DLR-Net).
 
 Many thanks to their authors for sharing these valuable contributions!

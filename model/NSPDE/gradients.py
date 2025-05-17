@@ -1,3 +1,4 @@
+# Adapted from https://github.com/crispitagorico/torchspde
 import torch
 import numpy as np
 from .neural_spde import NeuralSPDE

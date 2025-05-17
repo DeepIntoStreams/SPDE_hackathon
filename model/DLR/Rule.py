@@ -1,3 +1,5 @@
+# Adapted from https://github.com/sdogsq/DLR-Net
+
 class Rule():
     
     # This is a class that creates a rule for the model. It consists of additive, multiplicative and degrees 

@@ -1,3 +1,7 @@
+# Adapted from https://github.com/crispitagorico/torchspde
+# Modified for current implementation by the authors of SPDEBench
+
+
 import torch
 import csv
 import itertools

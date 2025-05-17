@@ -1,12 +1,12 @@
-# adapted from https://github.com/patrick-kidger/NeuralCDE
+# Adapted from https://github.com/crispitagorico/torchspde
+#  (originally from https://github.com/patrick-kidger/NeuralCDE)
 
 import torch
 import torchcde
 import itertools
 import csv
 import numpy as np
-from .utils import UnitGaussianNormalizer
-from model.NSPDE.utilities import LpLoss, count_params, EarlyStopping
+from model.utilities import *
 
 class MLP(torch.nn.Module):
     def __init__(self, in_size, out_size):

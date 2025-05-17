@@ -1,3 +1,4 @@
+# Adapted from https://github.com/crispitagorico/torchspde
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

@@ -1,5 +1,7 @@
-# adapted from https://github.com/patrick-kidger/torchcde.git 
-# in our case we already have the derivatives in input, so we modify the derivative method to return the evaluation 
+# Adapted from https://github.com/crispitagorico/torchspde
+# (originally from https://github.com/patrick-kidger/torchcde.git)
+
+# in our case we already have the derivatives in input, so we modify the derivative method to return the evaluation
 
 import math
 import torch

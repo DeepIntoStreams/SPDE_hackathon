@@ -1,4 +1,6 @@
-# adapted from https://github.com/zongyi-li/fourier_neural_operator
+# Adapted from https://github.com/crispitagorico/torchspde
+#  (originally from https://github.com/zongyi-li/fourier_neural_operator)
+# Modified for current implementation by the authors of SPDEBench
 
 import torch
 import csv

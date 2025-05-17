@@ -1,6 +1,6 @@
-# adapted from https://github.com/locuslab/deq.git
-# Modified based on the DEQ repo.
-# Modified based on the DEQ repo.
+# Adapted from https://github.com/crispitagorico/torchspde
+#   adapted from https://github.com/locuslab/deq.git
+#   Modified based on the DEQ repo.
 
 import torch
 from torch import nn
