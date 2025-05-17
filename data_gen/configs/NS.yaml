@@ -1,27 +1,27 @@
-# Viscosity parameter
 nu: 1e-4
 
-# GRF
 alpha: 3
 tau: 3
+fix_u0: ${fix_u0}  # [True,False] True--fix; False--vary
 
-# Stochastic forcing function: sigma*dW/dt
-stochastic_forcing: {'alpha': 0.005, 'kappa': 10, 'sigma': 0.05}
+alpha_Q: 0.005  # Q Wiener process
+kappa: 10
+sigma: 0.005
+truncation: ${truncation}  # [32,64,128,256]
 
-# Spatial Resolution
-s: 64
+s: 64  # Spatial Resolution
+sub_x: 1
 
-# Temporal Resolution
-T: 1
-delta_t: 1e-3
+T: 1  # End time
+delta_t: 1e-3  # time meshsize
+sub_t: 10  # downsample: 1000 -> 100
 
-# Number of solutions to generate
-N: 10
-
-# Batch size (Solve equations in batches)
-bsize: 10
-
+N: 1200  # Number of solutions to generate
+bsize: 100  # Batch size (Solve equations in batches)
+merge_data: False
 
 seed: 42
 
-save_dir: 'results/NS_xi_nu4/'
+save_dir: '../results/'
+# Data will be saved in a folder under this 'save_dir'.
+# Folder name will be 'NS_xi_nu4_trc64' if fix_u0=True and truncation=64, for example.

@@ -14,8 +14,6 @@ from tqdm import tqdm
 from data_gen.src.random_forcing import get_twod_bj, get_twod_dW, get_twod_dW_revised
 
 
-
-
 # a: domain where we are solving
 # w0: initial vorticity
 # f: deterministic forcing term
