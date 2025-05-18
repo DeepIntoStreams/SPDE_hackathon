@@ -1,20 +1,13 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
 import os
 import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..",".."))
-from model.NSPDE.neural_spde import *
 from model.NSPDE.utilities import *
+from model.utilities import *
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -47,31 +40,6 @@ def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
 
     torch.save(model.state_dict(), save_path)
 
-    # plt.plot(np.arange(1,len(losses_train)*5, 5), losses_train, label='train')
-    # plt.plot(np.arange(1,len(losses_test)*5, 5), losses_test, label='test')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Relative L2 loss')
-    # plt.legend()
-    # plt.show()
-    #
-    # # Visualize pridictions
-    # from utilities import plot_1d, contour_plot_1d
-    # plot_1d(model, test_loader, device, i=1, T_=5, T=51, a=1)
-    # contour_plot_1d(model, test_loader, device, O_X[0,:-1], O_T[0,:51])
-
-    # Memory profilling
-    # mem_log = []
-    # for u0_, xi_, u_ in train_loader:
-    #     input = u0_.to(device), xi_.to(device)
-    #     break
-    # try:
-    #     mem_log.extend(log_mem(model, input, exp='baseline'))
-    # except Exception as e:
-    #     print(f'log_mem failed because of {e}')
-    #
-    # df = pd.DataFrame(mem_log)
-    # plot_mem(df, exps=['baseline'])
-
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
                  plateau_patience, plateau_terminate, print_every,
@@ -99,7 +67,7 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
                                 checkpoint_file=checkpoint_file,
                                 final_checkpoint_file=final_checkpoint_file)
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_nspde_GL_u0")
+@hydra.main(version_base=None, config_path="../config/", config_name="nspde")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
     run_training(**cfg.args)

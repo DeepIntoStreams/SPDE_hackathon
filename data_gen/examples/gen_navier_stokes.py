@@ -7,12 +7,7 @@ from omegaconf import DictConfig
 import torch
 import numpy as np
 import math
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import scipy.io
-import h5py
-import pickle
-import matplotlib.animation
 import os
 import random
 from data_gen.src.generator_sns import navier_stokes_2d

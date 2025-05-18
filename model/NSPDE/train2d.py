@@ -1,20 +1,13 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
 import os
 import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..",".."))
-from model.NSPDE.neural_spde import *
 from model.NSPDE.utilities import *
+from model.utilities import *
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -50,13 +43,6 @@ def run_training(data_path, ntrain, ntest, batch_size, sub_x, T, sub_t,
 
     torch.save(model.state_dict(), save_path)
 
-    plt.plot(np.arange(1, len(losses_train) * 5, 5), losses_train, label='train')
-    plt.plot(np.arange(1, len(losses_test) * 5, 5), losses_test, label='test')
-    plt.xlabel('Epoch')
-    plt.ylabel('Relative L2 loss')
-    plt.legend()
-    plt.show()
-
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
                  plateau_patience, plateau_terminate, print_every,
@@ -85,7 +71,7 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
                                    final_checkpoint_file=final_checkpoint_file)
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_nspde_NS_xi.yaml")
+@hydra.main(version_base=None, config_path="../config/", config_name="nspde_NS.yaml")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
     # run_training(**cfg.args)

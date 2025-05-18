@@ -1,13 +1,6 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
 import os
 import os.path as osp
 import sys
@@ -105,13 +98,13 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
                                 final_checkpoint_file=final_checkpoint_file)
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_fno_GL_xi")
+@hydra.main(version_base=None, config_path="../config/", config_name="fno")
 def main(cfg: DictConfig):
-    print('Running FNO wave xi->u  ...')
-    # run_training_xi(**cfg.args)
+    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    run_training_xi(**cfg.args)
     # run_training_u0(**cfg.args)
-    hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
+    # hyperparameter_tuning(**cfg.tuning)
 
 
 if __name__ == '__main__':

@@ -176,10 +176,7 @@ SPDE_hackathon
     │       
     ├───NRDE
     │       NRDE.py
-    │       train.py
-    │       train_sweep.py
-    │       train_wb.py
-    │       utils.py
+    │       train1d.py
     │       
     └───NSPDE
             diffeq_solver.py

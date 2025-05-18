@@ -6,8 +6,7 @@ import csv
 import itertools
 import numpy as np
 import torchcde
-from .utils import UnitGaussianNormalizer
-from model.NSPDE.utilities import LpLoss, count_params, EarlyStopping
+from model.utilities import *
 
 ######################
 # A CDE model looks like
@@ -159,76 +158,6 @@ def dataloader_nrde_1d(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, batch_size=
 
     return train_loader, test_loader, interval, xi_train.size(-1), normalizer
 
-
-# def dataloader_nrde_1d_val(u, xi, ntrain=840, nval=180, ntest=180, T=51, sub_t=1, batch_size=20, dim_x=128, depth=2,
-#                        window_length=10, normalizer=True, interpolation='linear', dataset=None):
-#     if dataset == 'phi41':
-#         T, sub_t = 51, 1
-#     elif dataset == 'wave':
-#         T, sub_t = (u.shape[-1] + 1) // 2, 5
-#
-#     u_train = u[:ntrain, :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     xi_train = xi[:ntrain, :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     t = torch.linspace(0., xi_train.shape[1], xi_train.shape[1])[None, :, None].repeat(ntrain, 1, 1)
-#     xi_train = torch.cat([t, xi_train], dim=2)
-#
-#     u_val = u[ntrain:(ntrain + nval), :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     xi_val = xi[ntrain:(ntrain + nval), :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     t = torch.linspace(0., xi_val.shape[1], xi_val.shape[1])[None, :, None].repeat(nval, 1, 1)
-#     xi_val = torch.cat([t, xi_val], dim=2)
-#
-#     u_test = u[-ntest:, :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     xi_test = xi[-ntest:, :dim_x, 0:T:sub_t].permute(0, 2, 1)
-#     t = torch.linspace(0., xi_test.shape[1], xi_test.shape[1])[None, :, None].repeat(ntest, 1, 1)
-#     xi_test = torch.cat([t, xi_test], dim=2)
-#
-#     #### get interval where we want the solution #########################################
-#     xi_train_dummy = torchcde.linear_interpolation_coeffs(xi_train)
-#     xi_train_dummy = torchcde.LinearInterpolation(xi_train_dummy)
-#     interval = xi_train_dummy._t
-#     ######################################################################################
-#
-#     #### this is what differs from NCDE ##################################################
-#     xi_train = torchcde.logsig_windows(xi_train, depth, window_length=window_length)
-#     xi_val = torchcde.logsig_windows(xi_val, depth, window_length=window_length)
-#     xi_test = torchcde.logsig_windows(xi_test, depth, window_length=window_length)
-#     ######################################################################################
-#
-#     if normalizer:
-#         xi_normalizer = UnitGaussianNormalizer(xi_train)
-#         xi_train = xi_normalizer.encode(xi_train)
-#         xi_val = xi_normalizer.encode(xi_val)
-#         xi_test = xi_normalizer.encode(xi_test)
-#
-#         normalizer = UnitGaussianNormalizer(u_train)
-#         u_train = normalizer.encode(u_train)
-#         u_val = normalizer.encode(u_val)
-#         u_test = normalizer.encode(u_test)
-#
-#     u0_train = u_train[:, 0, :]
-#     u0_val = u_val[:, 0, :]
-#     u0_test = u_test[:, 0, :]
-#
-#     # interpolation
-#     if interpolation == 'linear':
-#         xi_train = torchcde.linear_interpolation_coeffs(xi_train)
-#         xi_val = torchcde.linear_interpolation_coeffs(xi_val)
-#         xi_test = torchcde.linear_interpolation_coeffs(xi_test)
-#     elif interpolation == 'cubic':
-#         xi_train = torchcde.hermite_cubic_coefficients_with_backward_differences(xi_train)
-#         xi_val = torchcde.hermite_cubic_coefficients_with_backward_differences(xi_val)
-#         xi_test = torchcde.hermite_cubic_coefficients_with_backward_differences(xi_test)
-#
-#     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_train, xi_train, u_train),
-#                                                batch_size=batch_size, shuffle=True)
-#     val_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_val, xi_val, u_val),
-#                                              batch_size=batch_size, shuffle=False)
-#     test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_test, xi_test, u_test),
-#                                               batch_size=batch_size, shuffle=False)
-#
-#     return train_loader, val_loader, test_loader, interval, xi_train.size(-1), normalizer
-
-
 #===========================================================================
 # Training and Testing functionalities (same as NCDE)
 #===========================================================================
@@ -331,98 +260,6 @@ def train_nrde_1d(model, train_loader, test_loader, u_normalizer, device, myloss
                 losses_train.append(train_loss/ntrain)
                 losses_test.append(test_loss/ntest)
                 print('Epoch {:04d} | Total Train Loss {:.6f} | Total Test Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
-
-        return model, losses_train, losses_test
-
-    except KeyboardInterrupt:
-
-        return model, losses_train, losses_test
-
-
-def train_nrde_1d_wb(model, train_loader, test_loader, u_normalizer, device, myloss, batch_size=20, epochs=5000,
-                  learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20, plateau_patience=None,
-                  plateau_terminate=None, delta=0, checkpoint_file='checkpoint.pt', wb=None, test_or_val='Test'):
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-
-    if plateau_patience is None:
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
-    else:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6,
-                                                               min_lr=1e-7)
-    if plateau_terminate is not None:
-        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
-
-    ntrain = len(train_loader.dataset)
-    ntest = len(test_loader.dataset)
-
-    losses_train = []
-    losses_test = []
-
-    try:
-
-        for ep in range(epochs):
-
-            model.train()
-
-            train_loss = 0.
-            for u0_, xi_, u_ in train_loader:
-
-                loss = 0.
-
-                u0_ = u0_.to(device)
-                xi_ = xi_.to(device)
-                u_ = u_.to(device)
-
-                u_pred = model(u0_, xi_)
-
-                if u_normalizer is not None:
-                    u_pred = u_normalizer.decode(u_pred.cpu())
-                    u_ = u_normalizer.decode(u_.cpu())
-
-                loss = myloss(u_pred[:, 1:, :].reshape(batch_size, -1), u_[:, 1:, :].reshape(batch_size, -1))
-
-                train_loss += loss.item()
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-
-            test_loss = 0.
-            with torch.no_grad():
-                for u0_, xi_, u_ in test_loader:
-
-                    loss = 0.
-
-                    u0_ = u0_.to(device)
-                    xi_ = xi_.to(device)
-                    u_ = u_.to(device)
-
-                    u_pred = model(u0_, xi_)
-
-                    if u_normalizer is not None:
-                        u_pred = u_normalizer.decode(u_pred.cpu())
-                        u_ = u_normalizer.decode(u_.cpu())
-
-                    loss = myloss(u_pred[:, 1:, :].reshape(batch_size, -1), u_[:, 1:, :].reshape(batch_size, -1))
-
-                    test_loss += loss.item()
-
-            if plateau_patience is None:
-                scheduler.step()
-            else:
-                scheduler.step(test_loss / ntest)
-            if plateau_terminate is not None:
-                early_stopping(test_loss / ntest, model)
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break
-
-            if wb:
-                wb.log({'Train Loss': train_loss / ntrain, f'{test_or_val} Loss': test_loss / ntest})
-            if ep % print_every == 0:
-                losses_train.append(train_loss / ntrain)
-                losses_test.append(test_loss / ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | '.format(ep, train_loss / ntrain)
-                      + f'Total {test_or_val} Loss ' + '{:.6f}'.format(test_loss / ntest))
 
         return model, losses_train, losses_test
 

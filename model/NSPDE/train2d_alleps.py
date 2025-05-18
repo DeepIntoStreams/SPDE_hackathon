@@ -191,7 +191,7 @@ def hyperparameter_tuning(data_test_path, data_path_2, data_path_8, data_path_32
                                    final_checkpoint_file=final_checkpoint_file)
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_nspde_NS_xi.yaml")
+@hydra.main(version_base=None, config_path="../config/", config_name="nspde_NS_xi.yaml")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
     # run_training(**cfg.args)

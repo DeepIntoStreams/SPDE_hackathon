@@ -1,9 +1,6 @@
-import torch
-import numpy as np
-import pandas as pd
 import scipy.io
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import os
 import os.path as osp
 import sys
@@ -16,7 +13,7 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
+def train(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
                  scheduler_step, scheduler_gamma, print_every,
                  dim_x, T, sub_t,
                  normalizer, interpolation,
@@ -47,18 +44,6 @@ def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
 
     torch.save(model.state_dict(), save_path)
 
-    # mem_log = []
-    # for u0_, xi_, u_ in train_loader:
-    #     input = u0_.to(device), xi_.to(device)
-    #     break
-    # try:
-    #     mem_log.extend(log_mem(model, input, exp='baseline'))
-    # except Exception as e:
-    #     print(f'log_mem failed because of {e}')
-    #
-    # df = pd.DataFrame(mem_log)
-    # plot_mem(df, exps=['baseline'])
-
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
                  plateau_patience, plateau_terminate, print_every,
                  dim_x, T, sub_t,
@@ -85,12 +70,12 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
 
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_ncde_GL_u0_xi")
+@hydra.main(version_base=None, config_path="../config/", config_name="ncde")
 def main(cfg: DictConfig):
-    print('Running ncde wave u0 xi 32 euler ...')
-    run_training(**cfg.args)
+    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    train(**cfg.args)
     # hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
 
 
 if __name__ == '__main__':

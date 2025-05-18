@@ -1,15 +1,7 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
 import signatory
-import wandb
 import os
 import os.path as osp
 import sys
@@ -22,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate, weight_decay,
+def train(data_path, ntrain, ntest, batch_size, epochs, learning_rate, weight_decay,
                  scheduler_step, scheduler_gamma, print_every,
                  dim_x, T, sub_t,
                  depth, window_length, normalizer, interpolation, solver,
@@ -81,12 +73,12 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
                                hidden_channels, solver, epochs, print_every, learning_rate, plateau_patience,
                                plateau_terminate, log_file + '.csv', checkpoint_file, final_checkpoint_file)
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_nrde_GL_u0_xi")
+@hydra.main(version_base=None, config_path="../config/", config_name="nrde")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-    run_training(**cfg.args)
+
+    train(**cfg.args)
     # hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
 
 
 if __name__ == '__main__':

@@ -1,13 +1,6 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
 import os
 import os.path as osp
 import sys
@@ -76,18 +69,13 @@ def run_training_u0(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
     torch.save(model.state_dict(), save_path)
 
 
-# @hydra.main(version_base=None, config_path="../config/", config_name="config_fno_NS_xi")
-def main():  #(cfg: DictConfig):
+@hydra.main(version_base=None, config_path="../config/", config_name="fno_NS")
+def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg, resolve=True))
 
-    # print(OmegaConf.to_yaml(cfg, resolve=True))
-    run_training_xi("../../data_gen/NS_xi_nu4/merged_ns_xi.mat",
-                    40, 10, 10, 3, 0.0001,
-                    100, 0.5, 1,
-                    2, 100, 2, 16, 16, 10, 8, 4,
-                    'test_ns_xi.pth')
+    run_training_xi(**cfg.args)
     # run_training_u0(**cfg.args)
 
-    print('Done.')
 
 
 if __name__ == '__main__':

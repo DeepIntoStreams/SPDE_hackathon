@@ -1,53 +1,45 @@
-model: NRDE  #确认
-equation: Phi41+1  #确认
-#task: ${task}  # xi/u0xi
-data_type: ${data_type}  # xi/u0_xi  #确认
-truncation: ${truncation}  # [32,64,128,256]  #确认
+args:
+  data_path: '../../data_gen/results/Phi41+/Phi41+_xi_1200.mat'
+  ntrain: 1000
+  ntest: 200
+  dim_x: 128
+  batch_size: 20
+  T: 51
+  sub_t: 1
+  normalizer: True
+  interpolation: 'linear'
+  dataset: 'phi41'
+  depth: 2
+  window_length: 3
+  hidden_channels: 2
+  epochs: 5000
+  learning_rate: 0.001
+  weight_decay: 1e-4
+  scheduler_step: 100
+  scheduler_gamma: 0.5
+  print_every: 1
+  save_path: '../result/NRDE/Phi41+_xi_1200.pth'
 
-
-wandb:
-  entity: "SPDE_hackathon"  #确认
-  project: "${model}_${equation}"  #确认
-  name: "${data_type}_trc${truncation}"  #确认
-
-#sweep:
-#  program: train_sweep.py
-#  name: "${task}_trc${truncation}"
-#  method: grid
-#  metric:
-#    name: loss_val
-#    goal: minimize
-#  parameters:
-#    hidden_channels:
-#      values: [8, 16, 32]
-#    solver:
-#      values: ['euler', 'rk4']
-
-fixed:
-  data:
-    data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'  #确认
-    dim_x: 128  #确认
-    T: 51  #确认
-    sub_t: 1  #确认
-  model:
-    solver: 'euler'  #确认
-    depth: 2  #确认
-    window_length: 3  #确认
-    hidden_channels: 16  #确认
-  train:
-    ntrain: 840  #确认
-    nval: 180  #确认
-    ntest: 180  #确认
-    normalizer: True  #确认
-    interpolation: 'linear'  #确认
-    batch_size: 20  #确认
-    epochs: 1000  #确认
-    learning_rate: 0.001  #确认
-    delta: 0.0001  #确认
-    print_every: 50  #确认
-    seed: 3407  #确认
-    plateau_patience: 20  #确认
-    plateau_terminate: 100  #确认
-    checkpoint_file: '${data_type}_trc${truncation}'  #确认
-  save:
-    base_dir: '../result/${model}_${equation}'  #确认
+tuning:
+  data_path: '../../data_gen/results/data_wave/wave_xi_1200.mat'
+  ntrain: 840
+  nval: 180
+  ntest: 180
+  dim_x: 128
+  batch_size: 20
+  T: 101  # phi41: 51
+  sub_t: 1
+  normalizer: None
+  interpolation: 'linear'
+  depth: 2
+  window_length: 3
+  hidden_channels: [8, 16, 32]  # to be decided
+  solver: ['euler', 'rk4']  # to be decided
+  epochs: 501
+  learning_rate: 0.0025
+  plateau_patience: 50
+  plateau_terminate: 100
+  print_every: 20
+  log_file: '../result/NRDE/wave_xi_log'
+  checkpoint_file: '../result/NRDE/wave_xi_1200_checkpoint.pth'
+  final_checkpoint_file: '../result/NRDE/wave_xi_1200_final.pth'

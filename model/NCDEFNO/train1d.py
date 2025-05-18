@@ -1,13 +1,6 @@
-import torch
-import torch.optim as optim
 import scipy.io
 import hydra
-from omegaconf import DictConfig
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
+from omegaconf import DictConfig, OmegaConf
 import os
 import os.path as osp
 import sys
@@ -20,7 +13,7 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
+def train(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
                  scheduler_step, scheduler_gamma, print_every,
                  dim_x, T, sub_t,
                  interpolation, dataset,
@@ -50,17 +43,6 @@ def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
 
     torch.save(model.state_dict(), save_path)
 
-    # mem_log = []
-    # for u0_, xi_, u_ in train_loader:
-    #     input = u0_.to(device), xi_.to(device)
-    #     break
-    # try:
-    #     mem_log.extend(log_mem(model, input, exp='baseline'))
-    # except Exception as e:
-    #     print(f'log_mem failed because of {e}')
-    #
-    # df = pd.DataFrame(mem_log)
-    # plot_mem(df, exps=['baseline'])
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
                  plateau_patience, plateau_terminate, print_every,
@@ -90,12 +72,12 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
                                      final_checkpoint_file=final_checkpoint_file)
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="config_ncdefno_GL_xi")
+@hydra.main(version_base=None, config_path="../config/", config_name="ncde-fno")
 def main(cfg: DictConfig):
-    print('Training NCDE-FNO with wave xi ...')
-    # run_training(**cfg.args)
-    hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
+    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    train(**cfg.args)
+    # hyperparameter_tuning(**cfg.tuning)
 
 
 if __name__ == '__main__':

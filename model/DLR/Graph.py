@@ -1,4 +1,5 @@
 # Adapted from https://github.com/sdogsq/DLR-Net
+# Modified for current implementation by the authors of SPDEBench
 
 
 from itertools import combinations_with_replacement as comb
