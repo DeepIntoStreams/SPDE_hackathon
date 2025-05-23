@@ -38,11 +38,12 @@ Settings of the equation can be tailored by choose different values for config a
 
 - `a`,`b`,`Nx` (and `c`,`d`,`Ny` in 2D case): begin point, end point, space resolution.
 - `s`,`t`,`Nt`: start time, end time, time resolution.
-- `truncation`: truncation degree of noise.
-- `sigma`:
+- `truncation`(`eps`): truncation degree of noise.
+- `sigma`: coefficient in the additive diffusive term.
 - `fix_u0`: `True`--fix initial condition; `False`--vary initial condition among samples.
 - `num`: number of samples generated.
-- `save_dir`:
+- `sub_x`,`sub_t`
+- `save_dir`
 - `save_name`
 
 (More details about the config args will be added later.)
@@ -64,22 +65,24 @@ python train1d.py
 
 - `task`: `xi` (or `u0xi` if applicable)
 - `data_path`: Directory where the datasets are saved.
-- `dim_x`: Dimension of the space variable.
+- `dim_x`: Number of points in space dimension.
 - `T`: Total number of time steps (i.e. time sequence length).
 - `sub_t`: Subsampling interval. Use all time steps in data if sub_t=1, or sample every sub_t steps to reduce data density.
 - `ntrain`,`nval`,`ntest`: Number of samples in the training, validation, and test sets.
-- `num_workers`: 
 - `epochs`: Total number of training epochs.
 - `batch_size`: Number of samples per batch.
 - `learning_rate`: Initial learning rate.
+- `weight_decay`: Used in the optimizer.
 - `scheduler_step`: Interval (in epochs) for learning rate adjustment.
 - `scheduler_gamma`: Learning rate decay factor. At each adjustment, the learning rate is multiplied by this value.
-- `plateau_patience`: 
-- `plateau_patience`
-- `delta`: Minimum threshold forimprovement.
+- `plateau_patience`: Used in some scheduler to control the reduction of learning rate.
+- `plateau_terminate`: Early stop the training if validation loss doesn't improve after such number of epochs.
+- `delta`: Minimum threshold for improvement.
 - `print_every`: Training log frequency.
 - `base_dir`: Directory where output files (i.e. checkpoints) will be saved.
 - `checkpoint_file`: File name of model checkpoints (.pth).
+
+(More details about the config args will be added later.)
 
 #### NCDE specific args:
 
