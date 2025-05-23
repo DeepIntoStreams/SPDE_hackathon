@@ -1,32 +1,27 @@
-model: DLR
+model: DLR  #确认
 equation: NS
-#task: ${task}  # xi/u0xi
 data_type: u0xi #${data_type}  # xi/u0xi/xi/u0_xi
 truncation: ${truncation}  # [32,64,128,256]
 
-fixed:
-  data:
-    data_path: '../../data_gen/NS_${data_type}_nu4_trc${truncation}_DLR/merged_ns_trc${truncation}.mat'
-#    data_path: '../../download_NS/NS_${data_type}.mat'
-    sub_x: 4
-    T: 100
-    sub_t: 1
-  model:
-    height: 2
-    nu: 1e-4
-  train:
-    ntrain: 1000
-#    nval: 0
-    ntest: 200
-    batch_size: 64
-    epochs: 1000 #500,1000
-    learning_rate: 1e-2
-    weight_decay: 1e-5
-    print_every: 50
-    seed: 3407
-    sche: 'cos'
-#    delta: 0
-#    plateau_terminate: 100
-    checkpoint_file: '${data_type}_trc${truncation}'
-  save:
-    base_dir: '../result/${model}_${equation}'
+data_path: '../../data_gen/NS_u0xi_trc${truncation}/merged_ns.mat'
+sub_x: 1
+T: 100
+sub_t: 1
+
+height: 2
+nu: 1e-4
+
+ntrain: 840
+nval: 180
+ntest: 180
+batch_size: 64
+epochs: 1000 #500,1000
+learning_rate: 1e-2
+weight_decay: 1e-5
+print_every: 50
+seed: 3407
+delta: 0.0001
+plateau_terminate: 100
+checkpoint_file: '${data_type}_trc${truncation}'
+
+base_dir: '../result/${model}_${equation}'

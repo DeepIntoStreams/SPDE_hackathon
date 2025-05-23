@@ -103,7 +103,7 @@ def mytrain(config):
                                    path=checkpoint_file)
     for epoch in range(1, config.epochs + 1):
 
-        # ------ (1) train ------
+        # ------ train ------
         tik = time.time()
         trainLoss = train(model, device, train_loader, optimizer, lossfn, epoch)
         tok = time.time()
@@ -111,9 +111,9 @@ def mytrain(config):
 
         scheduler.step()
 
-        testLoss = test(model, device, val_loader, lossfn)
+        valLoss = test(model, device, val_loader, lossfn)
 
-        early_stopping(testLoss, model)
+        early_stopping(valLoss, model)
         if early_stopping.early_stop:
             print("Early stopping")
             break
@@ -121,7 +121,7 @@ def mytrain(config):
         if (epoch-1) % config.print_every == 0:
             print('Epoch: {:04d} \tTrain Loss: {:.6f} \tVal Loss: {:.6f} \t\
                                Average Training Time per Epoch: {:.3f} \t' \
-                  .format(epoch, trainLoss, testLoss, trainTime / epoch))
+                  .format(epoch, trainLoss, valLoss, trainTime / epoch))
 
     ## ----------- test ------------
     model.load_state_dict(torch.load(checkpoint_file))
