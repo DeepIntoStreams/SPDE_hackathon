@@ -35,7 +35,7 @@ def simulator(cfg):
     record_steps = int(T / (cfg.delta_t))
 
     # Prepare save_dir
-    folder = f'{cfg.save_dir}NS_{'xi' if cfg.fix_u0 else 'u0xi'}_nu4_trc{cfg.truncation}/'
+    folder = f'{cfg.save_dir}NS_{'xi' if cfg.fix_u0 else 'u0xi'}_trc{cfg.truncation}/'
     os.makedirs(folder, exist_ok=True)
 
     # Solve equations in batches (order of magnitude speed-up)
@@ -47,9 +47,12 @@ def simulator(cfg):
     # Sample random fields
     if cfg.fix_u0 == True:
         w0 = GRF.sample(1).repeat(bsize,1,1)
+    else:
+        w_star = GRF.sample(1).repeat(bsize, 1, 1)
+
     for j in range(cfg.N // bsize):
         if cfg.fix_u0 == False:
-            w0 = GRF.sample(bsize)
+            w0 = w_star + GRF.sample(bsize)
 
         sol, sol_t, forcing = navier_stokes_2d([1, 1], w0, f, cfg.nu, T, cfg.delta_t, record_steps, stochastic_forcing)
 
@@ -64,14 +67,14 @@ def simulator(cfg):
         print(j, c, t1 - t0)
 
         # sum forcing in each time period
-        forcing = forcing[..., sub_t * (T // sub_t)]
-        extracted = forcing.view(*forcing.shape[:-1], T // sub_t, sub_t)  # [..., T//sub_t, sub_t]
-        summed_forcing = extracted.sum(dim=-1)  # [bsize, x, y, T//sub_t]
+        forcing = forcing[..., :sub_t * ((record_steps + 1) // sub_t)]
+        forcing = forcing.view(*forcing.shape[:-1], (record_steps + 1) // sub_t, sub_t)  # [..., T_steps//sub_t, sub_t]
+        summed_forcing = forcing.sum(dim=-1)  # [bsize, x, y, T_steps//sub_t]
 
         scipy.io.savemat(folder + 'NS_small_{j}.mat',
                          mdict={'t': time.numpy(),
-                                'sol': sol[:, ::sub_x, ::sub_x, ::sub_t].cpu().numpy(),  # [bsize, x, y, T//delta_t + 1]
-                                'forcing': summed_forcing[:, ::sub_x, ::sub_x, :].cpu().numpy(),  # [bsize, x, y, T//delta_t]
+                                'sol': sol[:, ::sub_x, ::sub_x, ::sub_t].cpu().numpy(),  # [bsize, x, y, T_steps//sub_t + 1]
+                                'forcing': summed_forcing[:, ::sub_x, ::sub_x, :].cpu().numpy(),  # [bsize, x, y, T_steps//sub_t]
                                 'param': stochastic_forcing})
 
     return folder
