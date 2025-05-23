@@ -1,4 +1,5 @@
 import scipy.io
+import random
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import os
@@ -13,62 +14,60 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training_xi(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
-                 scheduler_step, scheduler_gamma, print_every,
-                 dim_x, T, sub_t, dataset,
-                 modes1, modes2, width, L,
-                 save_path):
+def run_training_xi(config):
 
-    data = scipy.io.loadmat(data_path)
-
-    O_X, O_T, W, Sol = data['X'], data['T'], data['W'], data['sol']
+    # Load data
+    data = scipy.io.loadmat(config.data_path)
+    W, Sol = data['W'], data['sol']
+    print('W shape:', W.shape)
+    print('Sol shape:', Sol.shape)
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
 
-    train_loader, test_loader = dataloader_fno_1d_xi(data, xi, ntrain,
-                                                     ntest, T, sub_t, batch_size,
-                                                     dim_x, dataset)
+    ntrain = config.ntrain
+    nval = config.nval
+    ntest = config.ntest
 
-    model = FNO_space1D_time(modes1, modes2, width, T=T, L=L).cuda()
+    _, test_loader = dataloader_fno_1d_xi(u=data, xi=xi,
+                                          ntrain=ntrain+nval,
+                                          ntest=ntest,
+                                          T=config.T,
+                                          sub_t=config.sub_t,
+                                          batch_size=config.batch_size,
+                                          dim_x=config.dim_x)
+    train_loader, val_loader = dataloader_fno_1d_xi(u=data[:ntrain + nval], xi=xi[:ntrain + nval],
+                                          ntrain=ntrain,
+                                          ntest=nval,
+                                          T=config.T,
+                                          sub_t=config.sub_t,
+                                          batch_size=config.batch_size,
+                                          dim_x=config.dim_x)
 
-    print('The model has {} parameters'. format(count_params(model)))
-
-    loss = LpLoss(size_average=False)
-
-    model, losses_train, losses_test = train_fno_1d(model, train_loader, test_loader,
-                                                    device, loss, batch_size=batch_size, epochs=epochs,
-                                                    learning_rate=learning_rate, scheduler_step=scheduler_step,
-                                                    scheduler_gamma=scheduler_gamma, print_every=print_every)
-
-    torch.save(model.state_dict(), save_path)
-
-def run_training_u0(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
-                 scheduler_step, scheduler_gamma, print_every,
-                 dim_x, T, sub_t, dataset,
-                 modes1, modes2, width, L,
-                 save_path):
-
-    data = scipy.io.loadmat(data_path)
-
-    O_X, O_T, W, Sol = data['X'], data['T'], data['W'], data['sol']
-    data = torch.from_numpy(Sol.astype(np.float32))
-
-    train_loader, test_loader = dataloader_fno_1d_u0(data, ntrain,
-                                                     ntest, T, sub_t, batch_size,
-                                                     dim_x, dataset)
-
-    model = FNO_space1D_time(modes1, modes2, width, L, T).cuda()
-
-    print('The model has {} parameters'. format(count_params(model)))
+    model = FNO_space1D_time(modes1=config.modes1,
+                             modes2=config.modes2,
+                             width=config.width,
+                             L=config.L,
+                             T=config.T // config.sub_t).cuda()
+    print('The model has {} parameters'.format(count_params(model)))
 
     loss = LpLoss(size_average=False)
 
-    model, losses_train, losses_test = train_fno_1d(model, train_loader, test_loader,
-                                                    device, loss, batch_size=batch_size, epochs=epochs,
-                                                    learning_rate=learning_rate, scheduler_step=scheduler_step,
-                                                    scheduler_gamma=scheduler_gamma, print_every=print_every)
+    _, _, _ = train_fno_1d(model, train_loader, val_loader, device, loss,
+                              batch_size=config.batch_size,
+                              epochs=config.epochs,
+                              learning_rate=config.learning_rate,
+                              plateau_patience=config.plateau_patience,
+                              plateau_terminate=config.plateau_terminate,
+                              print_every=config.print_every,
+                              checkpoint_file=config.checkpoint_file)
+    model.load_state_dict(torch.load(config.checkpoint_file))
+    loss_train = eval_fno_1d(model, train_loader, loss, config.batch_size, device)
+    loss_val = eval_fno_1d(model, val_loader, loss, config.batch_size, device)
+    loss_test = eval_fno_1d(model, test_loader, loss, config.batch_size, device)
+    print('loss_train:', loss_train)
+    print('loss_val:', loss_val)
+    print('loss_test:', loss_test)
 
-    torch.save(model.state_dict(), save_path)
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
                  plateau_patience, plateau_terminate, print_every,
@@ -101,10 +100,18 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
 @hydra.main(version_base=None, config_path="../config/", config_name="fno")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-    run_training_xi(**cfg.args)
-    # run_training_u0(**cfg.args)
-    # hyperparameter_tuning(**cfg.tuning)
+    run_training_xi(cfg)
+    # hyperparameter_tuning(cfg)
 
 
 if __name__ == '__main__':

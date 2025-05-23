@@ -1,41 +1,35 @@
-args:
-  data_path: '../../data_gen/results/Phi41+/Phi41+_xi_1200.mat'
-  ntrain: 1000
-  ntest: 200
-  dim_x: 128
-  batch_size: 20
-  T: 51
-  sub_t: 1
-  dataset: 'kdv'
-  modes1: 16  # [16, 32]
-  modes2: 16  # [16, 25]
-  width: 32  # d_h
-  L: 4  # iter [1, 2, 3, 4]
-  epochs: 501
-  learning_rate: 0.001
-  scheduler_step: 100
-  scheduler_gamma: 0.5
-  print_every: 20
-  save_path: '../result/FNO/Phi41+_xi_1200.pth'
+model: FNO
+equation: Phi41+
+task: xi  # u0/xi
+data_type: xi  # u0_xi/xi
+truncation: ${truncation}  # [32,64,128,256]
 
-tuning:
-  data_path: '../../data_gen/results/data_wave/wave_xi_1200.mat'
-  ntrain: 840
-  nval: 180
-  ntest: 180
-  dim_x: 128
-  batch_size: 20
-  T: 101  # phi41: 51
-  sub_t: 1
-  d_h: [32]
-  iter: [1, 2, 3, 4]  # to be decided
-  modes1: [16, 32]  # to be decided
-  modes2: [16, 25]  # to be decided
-  epochs: 501
-  learning_rate: 0.0025
-  plateau_patience: 50
-  plateau_terminate: 100
-  print_every: 20
-  log_file: '../result/FNO/wave_xi_log'
-  checkpoint_file: '../result/FNO/wave_xi_1200_checkpoint.pth'
-  final_checkpoint_file: '../result/FNO/wave_xi_1200_final.pth'
+L: 1  # [1, 2, 3, 4]  # iter
+modes1: 16  # [16, 32]
+modes2: 16  # [16, 25]
+
+data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'
+dim_x: 128
+T: 51
+sub_t: 1
+
+ntrain: 840
+nval: 180
+ntest: 180
+plateau_patience: 50
+plateau_terminate: 100
+
+#scheduler_step: 100
+#scheduler_gamma: 0.5
+
+batch_size: 20
+width: 32  # d_h
+epochs: 1000
+learning_rate: 0.0025
+weight_decay: 1e-4
+delta: 0.0001
+print_every: 50
+seed: 3407
+
+base_dir: '../result/${model}_${equation}'
+checkpoint_file: '${task}_trc${truncation}'

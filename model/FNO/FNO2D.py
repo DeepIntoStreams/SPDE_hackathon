@@ -238,10 +238,18 @@ def dataloader_fno_2d_u0(u, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4, batc
 # Training functionalities
 # ===========================================================================
 
-def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000, learning_rate=0.001,
-                 scheduler_step=100, scheduler_gamma=0.5, print_every=20):
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
+def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000,
+                       learning_rate=0.001, weight_decay=1e-4, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
+                       plateau_patience=None, plateau_terminate=None, delta=0,
+                       checkpoint_file='checkpoint.pt'):
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+    if plateau_patience is None:
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
+    else:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6, min_lr=1e-7)
+    if plateau_terminate is not None:
+        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
 
     ntrain = len(train_loader.dataset)
     ntest = len(test_loader.dataset)
@@ -257,8 +265,10 @@ def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20
 
             train_loss = 0.
             for xi_, u_ in train_loader:
-                xi_ = xi_.to(device)  # (batch_size, dim_x, dim_y, dim_t, dim_t)
-                u_ = u_.to(device)  # (batch_size, dim_x, dim_y, dim_t)
+                loss = 0.
+                xi_ = xi_.to(device)
+                u_ = u_.to(device)
+                optimizer.zero_grad()
 
                 u_pred = model(xi_)
                 u_pred = u_pred[..., 0]
@@ -267,7 +277,6 @@ def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20
                 train_loss += loss.item()
                 loss.backward()
                 optimizer.step()
-                optimizer.zero_grad()
 
             test_loss = 0.
             with torch.no_grad():
@@ -283,18 +292,28 @@ def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20
 
                     test_loss += loss.item()
 
-            scheduler.step()
+            if plateau_patience is None:
+                scheduler.step()
+            else:
+                scheduler.step(test_loss / ntest)
+            if plateau_terminate is not None:
+                early_stopping(test_loss / ntest, model)
+                if early_stopping.early_stop:
+                    print("Early stopping")
+                    break
+
             if ep % print_every == 0:
                 losses_train.append(train_loss / ntrain)
                 losses_test.append(test_loss / ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Test Loss {:.6f}'.format(ep, train_loss / ntrain,
-                                                                                               test_loss / ntest))
+                print('Epoch {:04d} | Total Train Loss {:.6f} | '.format(ep, train_loss / ntrain)
+                      + f'Total Val Loss ' + '{:.6f}'.format(test_loss / ntest))
 
         return model, losses_train, losses_test
 
     except KeyboardInterrupt:
 
         return model, losses_train, losses_test
+
 
 
 def eval_fno_2d(model, test_dl, myloss, batch_size, device):

@@ -1,0 +1,30 @@
+truncation: ${truncation}
+
+data_path: '../../data_gen/NS_xi_trc${truncation}/merged_ns.mat'
+data_name: 'NS'
+ntrain: 840
+nval: 180
+ntest: 180
+sub_x: 1
+T: 100
+sub_t: 1
+
+batch_size: 20
+L: 4  # [3, 4]  # iter
+modes1: 8  # [8, 16]
+modes2: 8
+modes3: 8
+width: 8  # d_h 32
+epochs: 1000
+learning_rate: 0.001  #[0.0075, 0.005, 0.0025, 0.001]
+weight_decay: 1e-5
+delta: 0.0001
+plateau_patience: 35
+plateau_terminate: 100
+print_every: 50
+seed: 3407
+
+base_dir: '../result/FNO_NS'
+checkpoint_file: 'test_xi'
+
+

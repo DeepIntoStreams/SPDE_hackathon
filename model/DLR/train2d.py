@@ -145,8 +145,6 @@ def mytrain(config):
     print('loss_test:', testLoss)
 
 
-
-
 @hydra.main(version_base=None, config_path="../config/", config_name="dlr_ns")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
