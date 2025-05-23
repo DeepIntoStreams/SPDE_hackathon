@@ -74,7 +74,6 @@ class Graph():
         if extra_planted is not None:
             model.update(extra_planted)
             planted = planted.union(sorted(extra_planted.keys()))
-            print('sorted')
             # planted = planted.union(set(extra_planted.keys()))
             # for key in extra_deg.keys():
             #     if 'u_0' in key:
@@ -275,7 +274,6 @@ class Graph():
                                 # integrate trees from the previous iteration.
             this_round = self.I(model, planted, self.R.exceptions, self.derivative)
             keys = [tree for tree in sorted(this_round.keys()) if tree not in self.R.degrees and tree not in planted]
-            print('sorted')
             # keys = [tree for tree in this_round.keys() if tree not in self.R.degrees and tree not in planted]
 
             # include theese integrated trees to the model. Don't include trees that are not of the form I[\tau]

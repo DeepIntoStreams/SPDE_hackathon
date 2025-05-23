@@ -1,17 +1,12 @@
-model: DLR  #确认
+model: DLR
 equation: Phi41+  # Phi41+/Phi41+1
 #task: ${task}  # xi/u0xi
 data_type: ${data_type}  # xi/u0_xi
 truncation: ${truncation}  # [32,64,128,256]
 
-wandb:
-  entity: "SPDE_hackathon"  #确认
-  project: "${model}_${equation}"  #确认
-  name: "${data_type}_trc${truncation}"  #确认
-
 fixed:
   data:
-    data_path: '../../data_gen/results/${equation}_DLR/${equation}_${data_type}_trc${truncation}.mat'  #确认
+    data_path: '../../data_gen/results/${equation}_DLR/${equation}_${data_type}_trc${truncation}.mat'
   model:
     height: 2
   train:
@@ -23,9 +18,9 @@ fixed:
     learning_rate: 1e-3
     weight_decay: 1e-5
     print_every: 50
-    seed: 3407  #确认
+    seed: 3407
     delta: 0
     plateau_terminate: 100
-    checkpoint_file: '${data_type}_trc${truncation}'  #确认
+    checkpoint_file: '${data_type}_trc${truncation}'
   save:
-    base_dir: '../result/${model}_${equation}'  #确认
+    base_dir: '../result/${model}_${equation}'
