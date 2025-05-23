@@ -1,6 +1,11 @@
 numpy
 scipy
-torchcde==0.2.5
+hydra-core
+omegaconf
 torch
+torchcde==0.2.5
 signatory
 scikit-learn
+tqdm
+pandas
+matplotlib
