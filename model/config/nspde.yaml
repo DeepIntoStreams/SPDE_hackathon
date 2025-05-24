@@ -1,54 +1,36 @@
 model: NSPDE
-equation: wave
-task: u0xi  # u0/xi/u0xi
-data_type: u0_xi  # u0_xi/xi/u0_xi
-truncation: ${truncation}  # [32,64,128,256]
+equation: Phi41+
+data: Phi41+sigma01_xi_trc128_1200
 
-wandb:
-  entity: "SPDE_hackathon"
-  project: "${model}_${equation}"
-  name: "${task}_trc${truncation}"
+data_path: '../../data_gen/results/${equation}/${data}.mat'
+dim_x: 128
+T: 51
+sub_t: 1
 
-sweep:
-  program: train1d_wb.py
-  name: "${task}_trc${truncation}"
-  method: grid
-  metric:
-    name: loss_val
-    goal: minimize
-  parameters:
-    hidden_channels:
-      values: [ 32 ]
-    n_iter:
-        values: [1, 2, 3, 4]
-    modes1:
-        values: [32, 64]
-    modes2:
-        values: [32, 50]
+dim: 1
+in_channels: 1
+noise_channels: 1
+hidden_channels: 32
+n_iter: 1  # [1, 2, 3, 4]
+modes1: 64  # [32, 64]
+modes2: 50  # [32, 50]
 
-fixed:
-  data:
-    data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'
-    dim_x: 128
-    T: 101
-    sub_t: 1
-  tune_param:
-    ntrain: 800
-    nval: 200
-    ntest: 200
-    batch_size: 20
-    plateau_patience: 50
-    plateau_terminate: 100
-    checkpoint_file: '${task}_trc${truncation}'
-  model:
-    dim: 1
-    in_channels: 1
-    noise_channels: 1
-    epochs: 1000
-    learning_rate: 0.0025
-    weight_decay: 1e-4
-    delta: 0.0002
-    print_every: 100
-    seed: 3407
-  save:
-    base_dir: '../result/${model}_${equation}'
+ntrain: 840
+nval: 180
+ntest: 180
+batch_size: 20
+epochs: 1000
+learning_rate: 0.0025
+weight_decay: 1e-4
+#scheduler_step: 100
+#scheduler_gamma: 0.5
+plateau_patience: 50
+delta: 0.0002
+plateau_terminate: 100
+
+print_every: 10
+
+seed: 3407
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'

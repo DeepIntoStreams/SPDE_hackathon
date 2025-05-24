@@ -1,94 +1,32 @@
-args:
-  data_path: '/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/Phi41+/Phi41+_xi_1200.mat'
-  ntrain: 1000
-  ntest: 200
-  T: 51
-  sub_t: 1
-  batch_size: 20
-  dim_x: 128
-  normalizer: True
-  dataset: 'GL'
-  width: 128
-  branch_depth: 4
-  trunk_depth: 4
-  epochs: 501
-  learning_rate: 0.001
-  scheduler_step: 100
-  scheduler_gamma: 0.5
-  print_every: 5
-  save_path: '/root/autodl-tmp/SPDE_hackathon/model/result/DeepONet/Phi41+_xi_1200.pth'
+model: DeepONet
+equation: Phi41+
+data: Phi41+sigma01_xi_trc128_1200
 
-tuning:
-  data_path: '/root/autodl-tmp/SPDE_hackathon/data_gen/examples/results/data_wave/wave_xi_1200.mat'
-  ntrain: 840
-  nval: 180
-  ntest: 180
-  dim_x: 128
-  batch_size: 20
-  T: 101  # phi41: 51
-  sub_t: 1
-  normalizer: True
-  width: [128, 256, 512]  # to be decided
-  branch_depth: [2, 3, 4]  # to be decided
-  trunk_depth: [2, 3, 4]  # to be decided
-  epochs: 501
-  learning_rate: 0.0025
-  plateau_patience: 50
-  plateau_terminate: 100
-  print_every: 20
-  log_file: '/root/autodl-tmp/SPDE_hackathon/model/result/DeepONet/wave_xi_log'
-  checkpoint_file: '/root/autodl-tmp/SPDE_hackathon/model/result/DeepONet/wave_xi_1200_checkpoint.pth'
-  final_checkpoint_file: '/root/autodl-tmp/SPDE_hackathon/model/result/DeepONet/wave_xi_1200_final.pth'model: DeepONet  #确认
-equation: Phi41+1  #确认
-task: xi  # xi  #确认
-data_type: xi  # xi  #确认
-truncation: ${truncation}  # [32,64,128,256]  #确认
+data_path: '../../data_gen/results/${equation}/${data}.mat'
+dim_x: 128
+T: 51
+sub_t: 1
+normalizer: True
 
-wandb:
-  entity: "SPDE_hackathon"  #确认
-  project: "${model}_${equation}"  #确认
-  name: "${task}_trc${truncation}"  #确认
+width: 512  # [128, 256, 512]
+branch_depth: 3  # [2, 3, 4]
+trunk_depth: 3  # [2, 3, 4]
 
-sweep:
-  program: train_sweep.py
-  name: "${task}_trc${truncation}"
-  method: grid
-  metric:
-    name: loss_val
-    goal: minimize
-  parameters:
-    width:
-      values: [ 128, 256, 512 ]
-    branch_depth:
-      values: [ 2, 3, 4 ]
-    trunk_depth:
-      values: [ 2, 3, 4 ]
+ntrain: 840
+nval: 180
+ntest: 180
+batch_size: 20
+epochs: 1000
+learning_rate: 0.001
+#scheduler_step: 100
+#scheduler_gamma: 0.5
+plateau_patience: 50
+delta: 0.0001
+plateau_terminate: 100
 
+print_every: 50
 
-fixed:
-  data:
-    data_path: '../../data_gen/examples/results/${equation}/${equation}_${data_type}_trc${truncation}.mat'  #确认
-    dim_x: 128  #确认
-    T: 51  #确认
-    sub_t: 1  #确认
-#  model:
-#    width: 512  #确认
-#    branch_depth: 3  #确认
-#    trunk_depth: 3  #确认
-  train:
-    ntrain: 800  #确认
-    nval: 200  #确认
-    ntest: 200  #确认
-    normalizer: True  #确认
-    batch_size: 20  #确认
-    epochs: 1000  #确认
-    learning_rate: 0.0025  #确认
-    delta: 0.0002  #确认
-    print_every: 50  #确认
-    seed: 3407  #确认
-    plateau_patience: 20  #确认
-    factor: 0.5  #确认
-    plateau_terminate: 50  #确认
-    checkpoint_file: '${task}_trc${truncation}'  #确认
-  save:
-    base_dir: '../result/${model}_${equation}'  #确认
+seed: 3407
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'

@@ -1,42 +1,33 @@
-args:
-  data_path: '../../data_gen/results/Phi41+/Phi41+_xi_1200.mat'
-  ntrain: 1000
-  ntest: 200
-  dim_x: 128
-  batch_size: 20
-  T: 51
-  sub_t: 1
-  normalizer: True
-  interpolation: 'linear'
-  dataset: 'phi41'
-  hidden_channels: 16
-  solver: 'rk4'
-  epochs: 500
-  learning_rate: 0.001
-  scheduler_step: 100
-  scheduler_gamma: 0.5
-  print_every: 10
-  save_path: '../result/NCDE/Phi41+_xi_1200.pth'
+model: NCDE
+equation: Phi41+
+data: Phi41+sigma01_xi_trc128_1200
 
-tuning:
-  data_path: '../../data_gen/results/data_wave/wave_xi_1200.mat'
-  ntrain: 840
-  nval: 180
-  ntest: 180
-  dim_x: 128
-  batch_size: 20
-  T: 101  # phi41: 51
-  sub_t: 1
-  normalizer: True
-  interpolation: 'linear'
-#  dataset: 'phi41'
-  hidden_channels: [8, 16, 32]  # to be decided
-  solver: ['euler', 'rk4']  # to be decided
-  epochs: 501
-  learning_rate: 0.0025
-  plateau_patience: 50
-  plateau_terminate: 100
-  print_every: 20
-  log_file: '../result/NCDE/wave_xi_1200_log'
-  checkpoint_file: '../result/NCDE/wave_xi_1200_checkpoint.pth'
-  final_checkpoint_file: '../result/NCDE/wave_xi_1200_final.pth'
+data_path: '../../data_gen/results/${equation}/${data}.mat'
+dim_x: 128
+T: 51
+sub_t: 1
+normalizer: True
+interpolation: 'linear'
+
+hidden_channels: 32
+solver: 'euler'
+
+ntrain: 840
+nval: 180
+ntest: 180
+
+batch_size: 20
+epochs: 1000
+learning_rate: 0.001
+#scheduler_step: 100
+#scheduler_gamma: 0.5
+plateau_patience: 50
+delta: 0.0001
+plateau_terminate: 100
+
+print_every: 20
+
+seed: 3407
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'

@@ -284,10 +284,10 @@ def eval_ncdeinf_1d(model, test_dl, myloss, batch_size, device):
             u_pred = model(u0_, xi_)
             loss = myloss(u_pred[:, :, 1:, :].reshape(batch_size, -1), u_[:, :, 1:, :].reshape(batch_size, -1))
             test_loss += loss.item()
-    print('Test Loss: {:.6f}'.format(test_loss / ntest))
+    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
-def train_ncdeinf_1d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20, plateau_patience=None, plateau_terminate=None, checkpoint_file='checkpoint.pt'):
+def train_ncdeinf_1d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20, plateau_patience=None, delta=0, plateau_terminate=None, checkpoint_file='checkpoint.pt'):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
@@ -297,7 +297,7 @@ def train_ncdeinf_1d(model, train_loader, test_loader, device, myloss, batch_siz
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6, min_lr=1e-7)
 
     if plateau_terminate is not None:
-        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, path=checkpoint_file)
+        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
 
     ntrain = len(train_loader.dataset)
     ntest = len(test_loader.dataset)
@@ -357,7 +357,7 @@ def train_ncdeinf_1d(model, train_loader, test_loader, device, myloss, batch_siz
             if ep % print_every == 0:
                 losses_train.append(train_loss/ntrain)
                 losses_test.append(test_loss/ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Test Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
+                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Val Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
 
         return model, losses_train, losses_test
     

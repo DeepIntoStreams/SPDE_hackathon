@@ -234,7 +234,7 @@ def eval_fno_1d(model, test_dl, myloss, batch_size, device):
             u_pred = u_pred[..., 0]
             loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
             test_loss += loss.item()
-    print('Test Loss: {:.6f}'.format(test_loss / ntest))
+    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 

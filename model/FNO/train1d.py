@@ -26,9 +26,7 @@ def train(config):
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
 
-    ntrain = config.ntrain
-    nval = config.nval
-    ntest = config.ntest
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
     _, test_loader = dataloader_fno_1d_xi(u=data, xi=xi,
                                           ntrain=ntrain+nval,
@@ -38,18 +36,15 @@ def train(config):
                                           batch_size=config.batch_size,
                                           dim_x=config.dim_x)
     train_loader, val_loader = dataloader_fno_1d_xi(u=data[:ntrain + nval], xi=xi[:ntrain + nval],
-                                          ntrain=ntrain,
-                                          ntest=nval,
-                                          T=config.T,
-                                          sub_t=config.sub_t,
-                                          batch_size=config.batch_size,
-                                          dim_x=config.dim_x)
+                                                    ntrain=ntrain,
+                                                    ntest=nval,
+                                                    T=config.T,
+                                                    sub_t=config.sub_t,
+                                                    batch_size=config.batch_size,
+                                                    dim_x=config.dim_x)
 
-    model = FNO_space1D_time(modes1=config.modes1,
-                             modes2=config.modes2,
-                             width=config.width,
-                             L=config.L,
-                             T=config.T // config.sub_t).cuda()
+    model = FNO_space1D_time(modes1=config.modes1, modes2=config.modes2, width=config.width,
+                             L=config.L, T=config.T // config.sub_t).cuda()
     print('The model has {} parameters'.format(count_params(model)))
 
     loss = LpLoss(size_average=False)
@@ -69,9 +64,9 @@ def train(config):
     loss_train = eval_fno_1d(model, train_loader, loss, config.batch_size, device)
     loss_val = eval_fno_1d(model, val_loader, loss, config.batch_size, device)
     loss_test = eval_fno_1d(model, test_loader, loss, config.batch_size, device)
-    print('loss_train (model in checkpoint):', loss_train)
-    print('loss_val (model in checkpoint):', loss_val)
-    print('loss_test (model in checkpoint):', loss_test)
+    print('loss_train (model saved in checkpoint):', loss_train)
+    print('loss_val (model saved in checkpoint):', loss_val)
+    print('loss_test (model saved in checkpoint):', loss_test)
 
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
@@ -104,7 +99,9 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
 
 @hydra.main(version_base=None, config_path="../config/", config_name="fno")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # print(OmegaConf.to_yaml(cfg, resolve=True))
+
     # Set random seed
     seed = cfg.seed
     torch.manual_seed(seed)

@@ -1,4 +1,5 @@
 import scipy.io
+import random
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import os
@@ -13,32 +14,60 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training(data_path, ntrain, ntest, batch_size, epochs, learning_rate,
-                 scheduler_step, scheduler_gamma, print_every,
-                 dim_x, T, sub_t,
-                 dim, in_channels, noise_channels, hidden_channels,
-                 n_iter, modes1, modes2, save_path):
 
-    data = scipy.io.loadmat(data_path)
-    O_X, O_T, W, Sol = data['X'], data['T'], data['W'], data['sol']
-    # xi = torch.from_numpy(W.astype(np.float32))
+def train(config):
+
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
+
+    # Load data
+    data = scipy.io.loadmat(config.data_path)
+    W, Sol = data['W'], data['sol']
+    print('W shape:', W.shape)
+    print('Sol shape:', Sol.shape)
+    xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
 
-    train_loader, test_loader = dataloader_nspde_1d(u=data, xi=None, ntrain=ntrain,
-                                                    ntest=ntest, T=T, sub_t=sub_t,
-                                                    batch_size=batch_size, dim_x=dim_x)
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
-    model = NeuralSPDE(dim, in_channels, noise_channels, hidden_channels,
-                       n_iter=n_iter, modes1=modes1, modes2=modes2).cuda()
+    _, test_loader = dataloader_nspde_1d(u=data, xi=xi,
+                                         ntrain=ntrain + nval,
+                                         ntest=ntest,
+                                         T=config.T,
+                                         sub_t=config.sub_t,
+                                         batch_size=config.batch_size,
+                                         dim_x=config.dim_x)
+    train_loader, val_loader = dataloader_nspde_1d(u=data[:ntrain + nval], xi=xi[:ntrain + nval],
+                                                   ntrain=ntrain,
+                                                   ntest=nval,
+                                                   T=config.T,
+                                                   sub_t=config.sub_t,
+                                                   batch_size=config.batch_size,
+                                                   dim_x=config.dim_x)
+
+    model = NeuralSPDE(config.dim, config.in_channels, config.noise_channels, config.hidden_channels,
+                       n_iter=config.n_iter, modes1=config.modes1, modes2=config.modes2).cuda()
     print('The model has {} parameters'. format(count_params(model)))
 
     loss = LpLoss(size_average=False)
-    model, losses_train, losses_test = train_nspde(model, train_loader, test_loader,
-                                                   device, loss, batch_size=batch_size, epochs=epochs,
-                                                   learning_rate=learning_rate, scheduler_step=scheduler_step,
-                                                   scheduler_gamma=scheduler_gamma, print_every=print_every)
+    model, losses_train, losses_test = train_nspde(model, train_loader, val_loader, device, loss,
+                                                   batch_size=config.batch_size,
+                                                   epochs=config.epochs,
+                                                   learning_rate=config.learning_rate,
+                                                   weight_decay=config.weight_decay,
+                                                   plateau_patience=config.plateau_patience,
+                                                   delta=config.delta,
+                                                   plateau_terminate=config.plateau_terminate,
+                                                   print_every=config.print_every,
+                                                   checkpoint_file=checkpoint_file)
 
-    torch.save(model.state_dict(), save_path)
+    model.load_state_dict(torch.load(checkpoint_file))
+    loss_train = eval_nspde(model, train_loader, loss, config.batch_size, device)
+    loss_val = eval_nspde(model, val_loader, loss, config.batch_size, device)
+    loss_test = eval_nspde(model, test_loader, loss, config.batch_size, device)
+    print('loss_train (model saved in checkpoint):', loss_train)
+    print('loss_val (model saved in checkpoint):', loss_val)
+    print('loss_test (model saved in checkpoint):', loss_test)
 
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
@@ -69,10 +98,21 @@ def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, le
 
 @hydra.main(version_base=None, config_path="../config/", config_name="nspde")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg, resolve=True))
-    run_training(**cfg.args)
+
+    # print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    train(cfg)
     # hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
 
 
 if __name__ == '__main__':

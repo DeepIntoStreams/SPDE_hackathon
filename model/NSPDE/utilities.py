@@ -257,7 +257,7 @@ def eval_nspde(model, test_dl, myloss, batch_size, device):
             u_pred = model(u0_, xi_)
             loss = myloss(u_pred[...,1:].reshape(batch_size, -1), u_[...,1:].reshape(batch_size, -1))
             test_loss += loss.item()
-    print('Test Loss: {:.6f}'.format(test_loss / ntest))
+    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 def train_nspde(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000,
@@ -348,8 +348,7 @@ def train_nspde(model, train_loader, test_loader, device, myloss, batch_size=20,
             if ep % print_every == 0:
                 losses_train.append(train_loss/ntrain)
                 losses_test.append(test_loss/ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | '.format(ep, train_loss / ntrain)
-                      +f'Total {test_or_val} Loss '+'{:.6f}'.format(test_loss / ntest))
+                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Val Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
 
         if time_train and time_eval:
             return model, losses_train, losses_test, times_train, times_eval 

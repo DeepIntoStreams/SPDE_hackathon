@@ -8,8 +8,7 @@ import itertools
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from .utils import UnitGaussianNormalizer
-from model.utilities import LpLoss, count_params, EarlyStopping
+from model.utilities import *
 
 
 class DenseNet(nn.Module):
@@ -301,13 +300,14 @@ def eval_deeponet(model, test_dl, myloss, batch_size, device, grid, u_normalizer
 
             loss = myloss(u_pred.reshape(batch_size, -1), u_.reshape(batch_size, -1))
             test_loss += loss.item()
-    print('Test Loss: {:.6f}'.format(test_loss / ntest))
+    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 
-def train_deepOnet_1d(model, train_loader, test_loader, grid, u_normalizer, device, myloss, batch_size=20, epochs=5000,
-                      learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
-                      plateau_patience=None, plateau_terminate=None, checkpoint_file='checkpoint.pt', wb=None):
+def train_deepOnet_1d(model, train_loader, test_loader, grid, u_normalizer, device, myloss, batch_size=20,
+                      epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
+                      plateau_patience=None, factor=0.1, plateau_terminate=None, delta=0,
+                      checkpoint_file='checkpoint.pt'):
     grid = grid.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
@@ -315,99 +315,7 @@ def train_deepOnet_1d(model, train_loader, test_loader, grid, u_normalizer, devi
     if plateau_patience is None:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     else:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6,
-                                                               min_lr=1e-7)
-    if plateau_terminate is not None:
-        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, path=checkpoint_file)
-
-    ntrain = len(train_loader.dataset)
-    ntest = len(test_loader.dataset)
-
-    losses_train = []
-    losses_test = []
-
-    try:
-        for ep in range(epochs):
-
-            model.train()
-
-            train_loss = 0.
-            for u0_, u_ in train_loader:
-
-                loss = 0.
-
-                u0_ = u0_.to(device)
-                u_ = u_.to(device)
-
-                u_pred = model(u0_, grid)
-
-                if u_normalizer is not None:
-                    u_pred = u_normalizer.decode(u_pred.cpu())
-                    u_ = u_normalizer.decode(u_.cpu())
-
-                loss = myloss(u_pred.reshape(batch_size, -1), u_.reshape(batch_size, -1))
-
-                train_loss += loss.item()
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-
-            test_loss = 0.
-            with torch.no_grad():
-                for u0_, u_ in test_loader:
-
-                    loss = 0.
-
-                    u0_ = u0_.to(device)
-                    u_ = u_.to(device)
-
-                    u_pred = model(u0_, grid)
-
-                    if u_normalizer is not None:
-                        u_pred = u_normalizer.decode(u_pred.cpu())
-                        u_ = u_normalizer.decode(u_.cpu())
-
-                    loss = myloss(u_pred.reshape(batch_size, -1), u_.reshape(batch_size, -1))
-
-                    test_loss += loss.item()
-
-            if plateau_patience is None:
-                scheduler.step()
-            else:
-                scheduler.step(test_loss / ntest)
-            if plateau_terminate is not None:
-                early_stopping(test_loss / ntest, model)
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break
-
-            if wb:
-                wb.log({'Train Loss': train_loss / ntrain, 'Test Loss': test_loss / ntest})
-            if ep % print_every == 0:
-                losses_train.append(train_loss / ntrain)
-                losses_test.append(test_loss / ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Test Loss {:.6f}'.format(ep, train_loss / ntrain,
-                                                                                               test_loss / ntest))
-
-        return model, losses_train, losses_test
-
-    except KeyboardInterrupt:
-
-        return model, losses_train, losses_test
-
-
-def train_deepOnet_1d_wb(model, train_loader, test_loader, grid, u_normalizer, device, myloss, batch_size=20,
-                         epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
-                         plateau_patience=None, factor=0.1, plateau_terminate=None, delta=0,
-                         checkpoint_file='checkpoint.pt', wb=None, test_or_val='Test'):
-    grid = grid.to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-
-    if plateau_patience is None:
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
-    else:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, factor=factor,
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience,
                                                                threshold=1e-6, min_lr=1e-7)
     if plateau_terminate is not None:
         early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
@@ -473,13 +381,10 @@ def train_deepOnet_1d_wb(model, train_loader, test_loader, grid, u_normalizer, d
                     print("Early stopping")
                     break
 
-            if wb:
-                wb.log({'Train Loss': train_loss / ntrain, f'{test_or_val} Loss': test_loss / ntest})
             if ep % print_every == 0:
                 losses_train.append(train_loss / ntrain)
                 losses_test.append(test_loss / ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | '.format(ep, train_loss / ntrain)
-                      + f'Total {test_or_val} Loss ' + '{:.6f}'.format(test_loss / ntest))
+                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Val Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
 
         return model, losses_train, losses_test
 
