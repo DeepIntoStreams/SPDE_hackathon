@@ -19,7 +19,7 @@ def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num):
     O_X, O_T = Noise().partition(a,b,dx), Noise().partition(s,t,dt) # space grid O_X and time grid O_T
 
     mu = lambda x: 3*x-x**3 # drift
-    sigma = lambda x: sigma # additive diffusive term
+    # sigma_fun = lambda x: sigma   # additive diffusive term
 
     ic = lambda x: x*(1-x) # initial condition (fixed part)
     if not fix_u0: # varying initial condition
@@ -43,7 +43,9 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     O_X, O_T, W, Soln_add = simulator(**cfg.sim)
 
-    filename = f'{cfg.save_name}_{'xi' if cfg.fix_u0 else 'u0_xi'}_trc{cfg.truncation}.mat'
+    sigma_type = '01' if cfg.sim.sigma == 0.1 else '1'
+    ic_type = 'xi' if cfg.sim.fix_u0 else 'u0_xi'
+    filename = f'{cfg.save_name}sigma{sigma_type}_{ic_type}_trc{cfg.sim.truncation}_{cfg.sim.num}.mat'
 
     os.makedirs(cfg.save_dir, exist_ok=True)
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X': O_X, 'T': O_T, 'W': W, 'sol': Soln_add})

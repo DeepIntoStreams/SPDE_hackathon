@@ -37,7 +37,7 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
         print("u0 is fixed!")
 
     # stochastic forcing
-    if noise_type == 'cylindrical':
+    if noise_type == 'cyl':
         r = 4  # Creates r/2 spatially smooth noise
         corr = lambda x, j, a: smooth_corr(x, j, a, r + 1.001)
         W_smooth = Noise().WN_space_time_many(s, t, dt * 0.1, a, b, dx, num, J=truncation, correlation=corr)
@@ -48,8 +48,7 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
         print('Invalid noise type!')
         exit(0)
 
-    # L_kdv = [0, 0, 1e-3, -0.1, 0]
-    L_kdv = [0, 0, 0, -0.1, 0]
+    L_kdv = [0, 0, 1e-3, -0.1, 0]
     mu_kdv = lambda x: 0
     sigma_kdv = lambda x: sigma
 
@@ -65,10 +64,10 @@ def main(cfg: DictConfig):
 
     O_X, O_T, W, soln = simulator(**cfg.sim)
 
+    # Save data
     os.makedirs(cfg.save_dir, exist_ok=True)
-
-    filename = f'{cfg.save_name}_{'xi' if cfg.fix_u0 else 'u0_xi'}_trc{cfg.sim.truncation}.mat'
-
+    ic_type = 'xi' if cfg.sim.fix_u0 else 'u0_xi'
+    filename = f'{cfg.save_name}{cfg.sim.noise_type}_{ic_type}_trc{cfg.sim.truncation}_{cfg.sim.num}.mat'
     scipy.io.savemat(cfg.save_dir + filename, mdict={'X':O_X, 'T':O_T, 'W': W, 'sol': soln})
     print("Saved to", cfg.save_dir + filename)
 

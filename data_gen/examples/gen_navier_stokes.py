@@ -8,8 +8,12 @@ import torch
 import numpy as np
 import math
 import scipy.io
-import os
 import random
+import os
+import os.path as osp
+import sys
+current_directory = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(osp.join(current_directory, "..", ".."))
 from data_gen.src.generator_sns import navier_stokes_2d
 from data_gen.src.random_forcing import GaussianRF
 from timeit import default_timer
@@ -35,7 +39,8 @@ def simulator(cfg):
     record_steps = int(T / (cfg.delta_t))
 
     # Prepare save_dir
-    folder = f'{cfg.save_dir}NS_{'xi' if cfg.fix_u0 else 'u0xi'}_trc{cfg.truncation}/'
+    ic_type = 'xi' if cfg.fix_u0 else 'u0_xi'
+    folder = f'{cfg.save_dir}NS_{ic_type}_trc{cfg.truncation}/'
     os.makedirs(folder, exist_ok=True)
 
     # Solve equations in batches (order of magnitude speed-up)
@@ -71,7 +76,7 @@ def simulator(cfg):
         forcing = forcing.view(*forcing.shape[:-1], (record_steps + 1) // sub_t, sub_t)  # [..., T_steps//sub_t, sub_t]
         summed_forcing = forcing.sum(dim=-1)  # [bsize, x, y, T_steps//sub_t]
 
-        scipy.io.savemat(folder + 'NS_small_{j}.mat',
+        scipy.io.savemat(folder + f'NS_small_{j}.mat',
                          mdict={'t': time.numpy(),
                                 'sol': sol[:, ::sub_x, ::sub_x, ::sub_t].cpu().numpy(),  # [bsize, x, y, T_steps//sub_t + 1]
                                 'forcing': summed_forcing[:, ::sub_x, ::sub_x, :].cpu().numpy(),  # [bsize, x, y, T_steps//sub_t]
@@ -130,7 +135,7 @@ def main(cfg: DictConfig):
 
     folder = simulator(cfg)
     if cfg.merge_data:
-        merge(cfg.N, cfg.bsize, folder)
+        merge(cfg.N, cfg.bsize, folder, output_name = f"merged_ns_{cfg.N}.mat")
 
 
 if __name__ == "__main__":

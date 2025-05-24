@@ -6,7 +6,7 @@ sim:
   t: 0.05
   Nt: 50  # dt = (t-s)/Nt
   truncation: ${truncation}  # [32,64,128,256]
-  sigma: 1  # coefficient of additive diffusive term
+  sigma: ${sigma}  # coefficient of additive diffusive term
   fix_u0: ${fix_u0}  # [True,False] True--fix; False--vary
   num: 1200
 

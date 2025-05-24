@@ -17,7 +17,7 @@ def solver(a, b, Nx, c, d, Ny, s, t, Nt, num, eps, sigma, fix_u0):
     ic = lambda x, y: np.sin(2 * np.pi * (x + y)) + np.cos(2 * np.pi * (x + y)) # initial condition (fixed)
 
     mu = lambda x: 3*x-x**3 # drift
-    sigma = lambda x: sigma # additive diffusive term
+    # sigma_fun = lambda x: sigma # additive diffusive term
 
     O_X, O_Y = Noise2D().partition_2d(a,b,dx,c,d,dy) # space grid O_X, O_Y
     O_T = Noise2D().partition(s,t,dt) # time grid O_T
@@ -42,11 +42,13 @@ def main(cfg: DictConfig):
     O_X, O_Y, O_T, W, eps, soln_reno, soln_expl = solver(**cfg.sim)
 
     os.makedirs(cfg.save_dir, exist_ok=True)
-    reno_filename = f'{cfg.save_name}_reno_{'xi' if cfg.fix_u0 else 'xi_u0'}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
+    ic_type = 'xi' if cfg.sim.fix_u0 else 'xi_u0'
+
+    reno_filename = f'{cfg.save_name}_reno_{ic_type}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
     scipy.io.savemat(cfg.save_dir + reno_filename, mdict={'X':O_X, 'Y':O_Y, 'T':O_T, 'W': W, 'eps':eps, 'sol': soln_reno})
     print("Saved to", cfg.save_dir + reno_filename)
 
-    expl_filename = f'{cfg.save_name}_expl_{'xi' if cfg.fix_u0 else 'xi_u0'}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
+    expl_filename = f'{cfg.save_name}_expl_{ic_type}_eps{cfg.sim.eps}_{cfg.sim.num}.mat'
     scipy.io.savemat(cfg.save_dir + expl_filename, mdict={'X':O_X, 'Y':O_Y, 'T':O_T, 'W': W, 'eps':eps, 'sol': soln_expl})
     print("Saved to", cfg.save_dir + expl_filename)
 

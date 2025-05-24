@@ -5,13 +5,13 @@ sim:
   s: 0
   t: 0.5
   Nt: 50  # dt = (t-s)/Nt = 1e-2
-  noise_type: ${noise_type}  # either 'cylindrical' or 'Q'
+  noise_type: Q  # ${noise_type}  # either 'cyl' or 'Q'
   truncation: ${truncation}  # sim.truncation=32,64,128,256
-  sigma: 1  # coefficient of additive diffusive term
+  sigma: 0.5  # coefficient of additive diffusive term
   fix_u0: ${fix_u0}  # True -> fix; False -> vary
   num: 1200
 
 seed: 42
 
 save_dir: '../results/KdV/'
-save_name: 'KdV'
+save_name: 'KdV+'

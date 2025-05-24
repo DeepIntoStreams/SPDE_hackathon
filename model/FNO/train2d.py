@@ -99,8 +99,7 @@ def train_xi(config):
 @hydra.main(version_base=None, config_path="../config/", config_name="fno_ns")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-
-    train_xi(**cfg.args)
+    train_xi(cfg)
 
 
 if __name__ == '__main__':

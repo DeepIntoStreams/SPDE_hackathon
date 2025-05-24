@@ -24,7 +24,7 @@ plateau_terminate: 100
 print_every: 50
 seed: 3407
 
-base_dir: '../result/FNO_NS'
+base_dir: '../result/FNO_${data_name}'
 checkpoint_file: 'test_xi'
 
 
