@@ -15,6 +15,8 @@ warnings.filterwarnings('ignore')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def train(config):
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
 
     # Load data
     data = scipy.io.loadmat(config.data_path)
@@ -53,20 +55,23 @@ def train(config):
     loss = LpLoss(size_average=False)
 
     _, _, _ = train_fno_1d(model, train_loader, val_loader, device, loss,
-                              batch_size=config.batch_size,
-                              epochs=config.epochs,
-                              learning_rate=config.learning_rate,
-                              plateau_patience=config.plateau_patience,
-                              plateau_terminate=config.plateau_terminate,
-                              print_every=config.print_every,
-                              checkpoint_file=config.checkpoint_file)
-    model.load_state_dict(torch.load(config.checkpoint_file))
+                           batch_size=config.batch_size,
+                           epochs=config.epochs,
+                           learning_rate=config.learning_rate,
+                           weight_decay=config.weight_decay,
+                           plateau_patience=config.plateau_patience,
+                           delta=config.delta,
+                           plateau_terminate=config.plateau_terminate,
+                           print_every=config.print_every,
+                           checkpoint_file=checkpoint_file)
+
+    model.load_state_dict(torch.load(checkpoint_file))
     loss_train = eval_fno_1d(model, train_loader, loss, config.batch_size, device)
     loss_val = eval_fno_1d(model, val_loader, loss, config.batch_size, device)
     loss_test = eval_fno_1d(model, test_loader, loss, config.batch_size, device)
-    print('loss_train:', loss_train)
-    print('loss_val:', loss_val)
-    print('loss_test:', loss_test)
+    print('loss_train (model in checkpoint):', loss_train)
+    print('loss_val (model in checkpoint):', loss_val)
+    print('loss_test (model in checkpoint):', loss_test)
 
 
 def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,

@@ -2,12 +2,12 @@ nu: 1e-4
 
 alpha: 3
 tau: 3
-fix_u0: ${fix_u0}  # [True,False] True--fix; False--vary
+fix_u0: True  # [True,False] True--fix; False--vary
 
 alpha_Q: 0.005  # Q Wiener process
 kappa: 10
 sigma: 0.005
-truncation: ${truncation}  # [32,64,128,256]
+truncation: 128  # [32,64,128,256]
 
 s: 64  # Spatial Resolution
 sub_x: 4

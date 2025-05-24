@@ -24,7 +24,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def mytrain(config):
 
     os.makedirs(config.base_dir, exist_ok=True)
-    checkpoint_file = config.base_dir + config.checkpoint_file + ".pth"
+    checkpoint_file = config.base_dir + config.checkpoint_file
 
     # Set random seed
     seed = config.seed
