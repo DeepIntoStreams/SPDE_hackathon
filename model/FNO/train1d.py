@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def run_training_xi(config):
+def train(config):
 
     # Load data
     data = scipy.io.loadmat(config.data_path)
@@ -110,7 +110,7 @@ def main(cfg: DictConfig):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    run_training_xi(cfg)
+    train(cfg)
     # hyperparameter_tuning(cfg)
 
 

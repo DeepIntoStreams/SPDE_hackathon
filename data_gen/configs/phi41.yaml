@@ -12,5 +12,5 @@ sim:
 
 seed: 42
 
-save_dir: '../results/Phi41/'
+save_dir: '../results/Phi41+/'
 save_name: 'Phi41+'

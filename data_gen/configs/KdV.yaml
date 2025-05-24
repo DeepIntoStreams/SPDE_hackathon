@@ -13,5 +13,5 @@ sim:
 
 seed: 42
 
-save_dir: '../results/KdV/'
+save_dir: '../results/KdV+/'
 save_name: 'KdV+'
