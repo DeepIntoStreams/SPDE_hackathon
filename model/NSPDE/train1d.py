@@ -45,7 +45,7 @@ def train(config):
                                                    batch_size=config.batch_size,
                                                    dim_x=config.dim_x)
 
-    model = NeuralSPDE(config.dim, config.in_channels, config.noise_channels, config.hidden_channels,
+    model = NeuralSPDE(dim=1, in_channels=1, noise_channels=1, hidden_channels=config.hidden_channels,
                        n_iter=config.n_iter, modes1=config.modes1, modes2=config.modes2).cuda()
     print('The model has {} parameters'. format(count_params(model)))
 

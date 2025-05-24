@@ -222,74 +222,62 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-def plot_2d_xi(model, data_loader, device, i=1, T_=5, T=100, a=0, wb=None):
+def plot_2d_u0xi(model, data_loader, device, i=1, T_=5, T=100, a=0):
     # i: choose i_th data
     # T_: number of time points where you want to plot
     # T: total time steps
     # a: begin plot since time step = a
 
-    for xi_, u_ in data_loader:  # choose the first batch to plot
+    for u0_, xi_, u_ in data_loader:  # choose the first batch to plot
+        u0_ = u0_.to(device)
         xi_ = xi_.to(device)
         u_ = u_.to(device)
         break
 
     with torch.no_grad():
-        u_pred = model(xi_)
-        u_pred = u_pred[..., 0]
+        u_pred = model(u0_, xi_).squeeze(1)
+    for i in [1]:
+        fig, ax = plt.subplots(2, T_, figsize=(T_*3, 6))
 
-    fig, ax = plt.subplots(2, T_, figsize=(T_*3, 6))
+        vmin = min(u_[i].min(), u_pred[i].min()).detach().cpu().numpy()
+        vmax = max(u_[i].max(), u_pred[i].max()).detach().cpu().numpy()
+        # vmin1 = u_[i].min().detach().cpu().numpy()
+        # vmax1 = u_[i].max().detach().cpu().numpy()
+        # vmin2 = u_pred[i].min().detach().cpu().numpy()
+        # vmax2 = u_pred[i].max().detach().cpu().numpy()
 
-    vmin = min(u_[i].min(), u_pred[i].min()).detach().cpu().numpy()
-    vmax = max(u_[i].max(), u_pred[i].max()).detach().cpu().numpy()
-    im_norm = colors.Normalize(vmin=vmin, vmax=vmax)
+        times = [0,20,40,60,80,99]
+        # times = np.linspace(a, T-1, T_)
+        for j in range(T_):
+            t = int(times[j])
 
-    times = np.linspace(a, T-1, T_)
-    for j in range(T_):
-        t = int(times[j])
+            # choose no.i data to plot
+            true_slice = u_[i,...,t].detach().cpu().numpy()
+            pred_slice = u_pred[i,...,t].detach().cpu().numpy()
 
-        # choose no.i data to plot
-        true_slice = u_[i,...,t].detach().cpu().numpy()
-        pred_slice = u_pred[i,...,t].detach().cpu().numpy()
+            im1 = ax[0, j].imshow(true_slice, cmap='viridis', vmin=vmin, vmax=vmax)
+            ax[0, j].set_title(f'Truth at time step {t}')
+            ax[0, j].set_xticks([])
+            ax[0, j].set_yticks([])
+            fig.colorbar(im1)
 
-        im1 = ax[0, j].imshow(true_slice, cmap='viridis', norm=im_norm)
-        ax[0, j].set_title(f'True at time step {t}')
+            if j==0:
+                continue
 
-        im2 = ax[1, j].imshow(pred_slice, cmap='viridis', norm=im_norm)
-        ax[1, j].set_title(f'Pred at time step {t}')
+            im2 = ax[1, j].imshow(pred_slice, cmap='viridis', vmin=vmin, vmax=vmax)
+            ax[1, j].set_title(f'Prediction at time step {t}')
+            ax[1, j].set_xticks([])
+            ax[1, j].set_yticks([])
+            fig.colorbar(im2)
 
-    # fig.colorbar(im1, fraction=.1)
-    plt.subplots_adjust(bottom=0.05, right=0.9, top=0.95)
-    cax = plt.axes((0.93, 0.1, 0.03, 0.8))  # [left, bottom, width, height]
-    # plt.colorbar(cax=cax) # Wrong!
+        ax_blank = fig.add_subplot(ax[1, 0])
+        ax_blank.set_xticks([])
+        ax_blank.set_yticks([])
+        ax_blank.spines['top'].set_visible(False)
+        ax_blank.spines['right'].set_visible(False)
+        ax_blank.spines['bottom'].set_visible(False)
+        ax_blank.spines['left'].set_visible(False)
+        ax_blank.set_frame_on(False)
 
-    fig.colorbar(im1, cax=cax, ax=ax, fraction=.1)
-
-    if wb:
-        wb.log({"True vs Pred on Test_data": wandb.Image(plt)})
-
-    plt.show()
-
-
-def save_model(cfg, sweep_id):
-
-    print("Sweep completed. Searching for best model (min val_loss) ...")
-    api = wandb.Api()
-    sweep = api.sweep(f"{cfg.wandb.entity}/{cfg.wandb.project}/{sweep_id}")
-
-    runs = sorted(sweep.runs, key=lambda run: run.summary.get("loss_val", float('inf')), reverse=False)
-    if runs:
-        best_run = runs[0]
-        loss_val = best_run.summary.get("loss_val", float('inf'))
-        loss_test = best_run.summary.get("loss_test", float('inf'))
-        print(f"Best run: {best_run.name} | min Val Loss: {loss_val} | min Test Loss: {loss_test}")
-        target_file = best_run.config.get("checkpoint_file", None)
-        if target_file:
-            save_dir = cfg.fixed.save.base_dir
-            os.makedirs(save_dir, exist_ok=True)
-            final_file = os.path.join(save_dir, f"{best_run.name}_sweep-{sweep_id}.pth")
-            shutil.copy(target_file, final_file)
-            print(f"Saved best run to {final_file}")
-        else:
-            print("No checkpoint file found in run config")
-    else:
-        print("No runs found in sweep")
+        plt.tight_layout()
+        plt.show()

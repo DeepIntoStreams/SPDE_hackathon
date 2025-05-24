@@ -1,3 +1,6 @@
+# Adapted from https://github.com/crispitagorico/torchspde
+# Modified for current implementation by the authors of SPDEBench
+
 import os
 import os.path as osp
 import sys
@@ -86,6 +89,8 @@ def dataloader_nspde_1d(u, xi=None, ntrain=1000, ntest=200, T=51, sub_t=1, batch
 #     return train_loader, test_loader
 
 # Get the data of Phi42
+
+
 def get_data_Phi42(parquetfile, data_path):
     # Read Parquet file
     df = pd.read_parquet(parquetfile)
@@ -262,9 +267,9 @@ def eval_nspde(model, test_dl, myloss, batch_size, device):
 
 def train_nspde(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000,
                 learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
-                weight_decay=1e-4, delta=0,
+                weight_decay=1e-4, delta=0, factor=0.1,
                 plateau_patience=None, plateau_terminate=None, time_train=False, time_eval=False,
-                checkpoint_file='checkpoint.pt', test_or_val='Test'):
+                checkpoint_file='checkpoint.pt'):
 
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
@@ -272,12 +277,9 @@ def train_nspde(model, train_loader, test_loader, device, myloss, batch_size=20,
     if plateau_patience is None:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     else:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6, min_lr=1e-7)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, factor=factor, threshold=1e-6, min_lr=1e-7)
     if plateau_terminate is not None:
-        early_stopping = EarlyStopping(patience=plateau_terminate,
-                                       verbose=False,
-                                       delta=delta,
-                                       path=checkpoint_file)
+        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
 
     ntrain = len(train_loader.dataset)
     ntest = len(test_loader.dataset)
@@ -473,72 +475,6 @@ def hyperparameter_search_nspde_2d(train_dl, val_dl, test_dl, solver, d_h=[32], 
             writer.writerow([_dh, _iter, _modes1, _modes2, nb_params, loss_train, loss_val, loss_test])
 
 
-def plot_1d(model, data_loader, device, i=1, T_=10, T=51, a=0):
-
-    for u0_, xi_, u_ in data_loader:
-        u0_ = u0_.to(device)
-        xi_ = xi_.to(device)
-        u_ = u_.to(device)
-        break
-
-    with torch.no_grad():
-        u_pred = model(u0_,xi_)
-
-    fig, ax = plt.subplots(1, T_, figsize=(T_*3, 3))
-
-    times = np.linspace(a, T-1, T_)
-    for j in range(T_):
-        t = int(times[j])
-        ax[j].plot(u_[i,...,t].detach().cpu().numpy(),label='true')
-        ax[j].plot(u_pred[i,0,...,t].detach().cpu().numpy(),label='pred')
-        ax[j].set_title(f'time step {j+1}')
-
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
-    "Sign sets of subplots with title"
-    row = fig.add_subplot(grid)
-    # the '\n' is important
-    row.set_title(f'{title}\n', fontweight='bold', fontsize=34)
-    # hide subplot
-    row.set_frame_on(False)
-    row.axis('off')
-
-def contour_plot_1d(model, data_loader, device, O_X, O_T, save_file=None):
-    
-    mpl.rcParams['xtick.major.pad'] = 8
-    mpl.rcParams['ytick.major.pad'] = 8
-    fig, ax = plt.subplots(2, 3, figsize=(20,10))
-    x_m, t_m = np.meshgrid(O_T, O_X)
-
-    for u0_, xi_, u_ in data_loader:
-        u0_ = u0_.to(device)
-        xi_ = xi_.to(device)
-        u_ = u_.to(device)
-        break
-
-    with torch.no_grad():
-        u_pred = model(u0_,xi_)
-
-    for i in range(3):
-        ax[0][i].contourf(x_m,t_m, u_[i].cpu().numpy(), 50, cmap=plt.cm.jet)
-        ax[1][i].contourf(x_m,t_m, u_pred[i,0,...].cpu().numpy(), 50, cmap=plt.cm.jet)
-        ax[0][i].set_xlabel('t')
-        ax[0][i].set_ylabel('x')
-        ax[1][i].set_xlabel('t')
-        ax[1][i].set_ylabel('x')
-
-    grid = plt.GridSpec(2, 3)
-    create_subtitle(fig, grid[0, ::], 'Ground truth solutions')
-    create_subtitle(fig, grid[1, ::], 'Predicted solutions with the Neural SPDE model')
-    plt.tight_layout()
-
-    if save_file is not None:
-        plt.savefig(save_file,bbox_inches='tight')
-
-    plt.show()
 
 
 #===============================================================================

@@ -41,9 +41,7 @@ def mytrain(config):
     data['Solution'] = data['Solution'][indices]
     data['W'] = data['W'][indices]
 
-    ntrain = config.ntrain
-    nval = config.nval
-    ntest = config.ntest
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
     _, test_W, _, test_U0, _, test_Y = dataloader_2d(u=data['Solution'], xi=data['W'], ntrain=ntrain + nval,
                                                      ntest=ntest, T=config.T,

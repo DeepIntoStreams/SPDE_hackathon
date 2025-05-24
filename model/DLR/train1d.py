@@ -40,9 +40,7 @@ def mytrain(config):
     data['T'] = data['T'].squeeze()
     data['X'] = data['X'].squeeze()
 
-    ntrain = config.ntrain
-    nval = config.nval
-    ntest = config.ntest
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
     train_W, test_W, train_U0, test_U0, train_Y, test_Y = train_test_split(data['W'],  # noise: [N,time,space]
                                                                            data['U0'],  # initial sol: [N,space]

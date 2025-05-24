@@ -17,27 +17,17 @@ warnings.filterwarnings('ignore')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def train_xi(config):
-    os.makedirs(config.base_dir, exist_ok=True)
-    checkpoint_file = config.base_dir + config.checkpoint_file + '.pth'
-
-    # Set random seed
-    seed = config.seed
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+def train(config):
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
 
     # Load data
     data = scipy.io.loadmat(config.data_path)
-    if config.data_name == 'phi42':
+    if config.equation == 'phi42':
         W, Sol = data['W'], data['sol']
         W = np.transpose(W, (0, 2, 3, 1))
         Sol = np.transpose(Sol, (0, 2, 3, 1))
-    elif config.data_name == 'NS':
+    elif config.equation == 'NS':
         W, Sol = data['forcing'], data['sol']
     print('W shape:', W.shape)
     print('Sol shape:', Sol.shape)
@@ -49,32 +39,21 @@ def train_xi(config):
 
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
-
-    ntrain = config.ntrain
-    nval = config.nval
-    ntest = config.ntest
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
     _, test_loader = dataloader_fno_2d_xi(u=data, xi=xi,
-                                          ntrain=ntrain + nval,
-                                          ntest=ntest,
-                                          T=config.T,
-                                          sub_t=config.sub_t,
+                                          ntrain=ntrain + nval, ntest=ntest,
+                                          T=config.T, sub_t=config.sub_t,
                                           sub_x=config.sub_x,
                                           batch_size=config.batch_size)
     train_loader, val_loader = dataloader_fno_2d_xi(u=data[:ntrain + nval], xi=xi[:ntrain + nval],
-                                                    ntrain=ntrain,
-                                                    ntest=nval,
-                                                    T=config.T,
-                                                    sub_t=config.sub_t,
+                                                    ntrain=ntrain, ntest=nval,
+                                                    T=config.T, sub_t=config.sub_t,
                                                     sub_x=config.sub_x,
                                                     batch_size=config.batch_size)
 
-    model = FNO_space2D_time(modes1=config.modes1,
-                             modes2=config.modes2,
-                             modes3=config.modes3,
-                             width=config.width,
-                             L=config.L,
-                             T=config.T // config.sub_t).cuda()
+    model = FNO_space2D_time(modes1=config.modes1, modes2=config.modes2, modes3=config.modes3, width=config.width,
+                             L=config.L, T=config.T // config.sub_t).cuda()
     print('The model has {} parameters'.format(count_params(model)))
 
     loss = LpLoss(size_average=False)
@@ -84,22 +63,36 @@ def train_xi(config):
                            epochs=config.epochs,
                            learning_rate=config.learning_rate,
                            plateau_patience=config.plateau_patience,
+                           delta=config.delta,
                            plateau_terminate=config.plateau_terminate,
                            print_every=config.print_every,
                            checkpoint_file=checkpoint_file)
+
     model.load_state_dict(torch.load(checkpoint_file))
     loss_train = eval_fno_2d(model, train_loader, loss, config.batch_size, device)
     loss_val = eval_fno_2d(model, val_loader, loss, config.batch_size, device)
     loss_test = eval_fno_2d(model, test_loader, loss, config.batch_size, device)
-    print('loss_train:', loss_train)
-    print('loss_val:', loss_val)
-    print('loss_test:', loss_test)
+    print('loss_train (model saved in checkpoint):', loss_train)
+    print('loss_val (model saved in checkpoint):', loss_val)
+    print('loss_test (model saved in checkpoint):', loss_test)
 
 
 @hydra.main(version_base=None, config_path="../config/", config_name="fno_ns")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg, resolve=True))
-    train_xi(cfg)
+
+    # print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    train(cfg)
 
 
 if __name__ == '__main__':
