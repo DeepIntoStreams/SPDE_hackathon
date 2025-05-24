@@ -31,7 +31,7 @@ To generate the data, run the corresponding python files in `data_gen/examples/`
 of $\Phi^4_2$ equation with varying initial conditions and noise truncation degree 128, run the following:
 
 ```bash
-python gen_phi42.py fix_u0=False eps=128
+python gen_phi42.py sim.fix_u0=False sim.eps=128
 ```
 
 Settings of the equation can be tailored by choose different values for config args.
