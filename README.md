@@ -38,7 +38,7 @@ Settings of the equation can be tailored by choose different values for config a
 
 - `a`,`b`,`Nx` (and `c`,`d`,`Ny` in 2D case): begin point, end point, space resolution.
 - `s`,`t`,`Nt`: start time, end time, time resolution.
-- `truncation`(`eps`): truncation degree of noise.
+- `truncation` or `eps`: truncation degree of noise.
 - `sigma`: coefficient in the additive diffusive term.
 - `fix_u0`: `True`--fix initial condition; `False`--vary initial condition among samples.
 - `num`: number of samples generated.
