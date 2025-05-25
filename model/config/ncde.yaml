@@ -9,13 +9,12 @@ sub_t: 1
 normalizer: True
 interpolation: 'linear'
 
-hidden_channels: 32
-solver: 'euler'
+hidden_channels: 32  # 32, [8, 16, 32]
+solver: 'euler'  # 'euler', ['euler', 'rk4']
 
 ntrain: 840
 nval: 180
 ntest: 180
-
 batch_size: 20
 epochs: 1000
 learning_rate: 0.001
@@ -31,3 +30,5 @@ seed: 3407
 
 save_dir: '../result/${model}_${equation}/'
 checkpoint_file: '${data}.pth'
+
+log_file: '${data}_log'

@@ -14,25 +14,15 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from model.DLR.utils2d import *
-from model.utilities import EarlyStopping, plot_2d_xi
+from model.utilities import EarlyStopping
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def mytrain(config):
 
-    os.makedirs(config.base_dir, exist_ok=True)
-    checkpoint_file = config.base_dir + config.checkpoint_file + '.pth'
-
-    # Set random seed
-    seed = config.seed
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
 
     reader = MatReader(config.data_path, to_torch = False)
     data = mat2data(reader, config.sub_t, config.sub_x)
@@ -145,7 +135,19 @@ def mytrain(config):
 
 @hydra.main(version_base=None, config_path="../config/", config_name="dlr_ns")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     mytrain(cfg)
 
 

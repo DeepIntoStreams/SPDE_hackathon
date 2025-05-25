@@ -1,6 +1,7 @@
 import torch
 import torch.optim as optim
 import scipy.io
+import random
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
@@ -191,12 +192,22 @@ def hyperparameter_tuning(data_test_path, data_path_2, data_path_8, data_path_32
                                    final_checkpoint_file=final_checkpoint_file)
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="nspde_NS_xi.yaml")
+@hydra.main(version_base=None, config_path="../config/", config_name="nspde_phi42.yaml")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     # run_training(**cfg.args)
     hyperparameter_tuning(**cfg.tuning)
-    print('Done.')
 
 
 if __name__ == '__main__':

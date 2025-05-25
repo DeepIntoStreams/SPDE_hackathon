@@ -1,9 +1,8 @@
-model: DLR  #确认
+model: DLR
 equation: NS
-data_type: u0xi #${data_type}  # xi/u0xi/xi/u0_xi
-truncation: ${truncation}  # [32,64,128,256]
+data: NS_u0_xi_trc128
 
-data_path: '../../data_gen/NS_u0xi_trc${truncation}/merged_ns.mat'
+data_path: '../../data_gen/results/${data}/merged_ns_1200.mat'
 sub_x: 1
 T: 100
 sub_t: 1
@@ -18,10 +17,12 @@ batch_size: 64
 epochs: 1000 #500,1000
 learning_rate: 1e-2
 weight_decay: 1e-5
-print_every: 50
-seed: 3407
 delta: 0.0001
 plateau_terminate: 100
-checkpoint_file: '${data_type}_trc${truncation}'
 
-base_dir: '../result/${model}_${equation}'
+print_every: 100
+
+seed: 3407
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'

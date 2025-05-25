@@ -30,3 +30,5 @@ seed: 3407
 
 save_dir: '../result/${model}_${equation}/'
 checkpoint_file: '${data}.pth'
+
+log_file: '${data}_log'

@@ -1,0 +1,58 @@
+model: NSPDE
+equation: Phi42+
+seed: 3407
+
+args:
+  data_path: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_128_1200.mat'
+  # data_test_path: '../../data_gen/results/Phi42+/Phi42+_reno_xi_eps_128_1200.mat'
+  # data_path_2: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_2_1200.mat'
+  # data_path_8: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_8_1200.mat'
+  # data_path_32: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_32_1200.mat'
+  # data_path_64: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_64_1200.mat'
+  # data_path_128: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_128_1200.mat'
+  ntrain: 840
+  ntest: 180
+  sub_x: 1
+  batch_size: 10
+  T: 250
+  sub_t: 5
+  hidden_channels: 32  # d_h
+  n_iter: 1  # [1, 2, 3, 4]
+  modes1: 16  # [8, 16]
+  modes2: 16  # [8, 16]
+  solver: 'fixed_point'
+  epochs: 100
+  learning_rate: 0.001
+  scheduler_step: 100
+  scheduler_gamma: 0.5
+  print_every: 20  # 10
+  save_path: '../result/${model}_${equation}/Phi42+_reno_xi_u0_eps_128_test.pth'
+
+tuning:
+  data_path: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_128_1200.mat'
+  # data_test_path: '../../data_gen/results/Phi42+/Phi42+_reno_xi_eps_128_1200.mat'
+  # data_path_2: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_2_1200.mat'
+  # data_path_8: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_8_1200.mat'
+  # data_path_32: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_32_1200.mat'
+  # data_path_64: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_64_1200.mat'
+  # data_path_128: '../../data_gen/results/Phi42+/Phi42+_reno_xi_u0_eps_128_1200.mat'
+  ntrain: 840
+  nval: 180
+  ntest: 180
+  sub_x: 1
+  batch_size: 10
+  T: 250
+  sub_t: 5
+  hidden_channels: [32]  # d_h
+  n_iter: [1, 2, 3, 4]  # to be decided
+  modes1: [8, 16]  # to be decided
+  modes2: [8, 16]  # to be decided
+  solver: 'fixed_point'
+  epochs: 100
+  learning_rate: 0.0025
+  plateau_patience: 50
+  plateau_terminate: 100
+  print_every: 5
+  log_file: '../result/${model}_${equation}/Phi42_reno_xi_u0_eps_128_1200_log'
+  checkpoint_file: '../result/${model}_${equation}/Phi42_reno_xi_u0_eps_128_1200_checkpoint.pth'
+  final_checkpoint_file: '../result/${model}_${equation}/Phi42_reno_xi_u0_eps_128_1200_checkpoint.pth'

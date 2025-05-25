@@ -372,56 +372,6 @@ def train_nspde(model, train_loader, test_loader, device, myloss, batch_size=20,
             return model, losses_train, losses_test
 
 
-
-def hyperparameter_search_nspde(train_dl, val_dl, test_dl, d_h=[32], iter=[1,2,3], modes1=[32,64], modes2=[32,64], epochs=500, print_every=20, lr=0.025, plateau_patience=100, plateau_terminate=100, log_file ='log_nspde', checkpoint_file='checkpoint.pt', final_checkpoint_file='final.pt'):
-
-    hyperparams = list(itertools.product(d_h, iter, modes1, modes2))
-
-    loss = LpLoss(size_average=False)
-    
-    fieldnames = ['d_h', 'iter', 'modes1', 'modes2', 'nb_params', 'loss_train', 'loss_val', 'loss_test']
-    with open(log_file, 'w', encoding='UTF8', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(fieldnames)
-        
-
-    best_loss_val = 1000.
-
-    for (_dh, _iter, _modes1, _modes2) in hyperparams:
-        
-        print('\n dh:{}, iter:{}, modes1:{}, modes2:{}'.format(_dh, _iter, _modes1, _modes2))
-
-        model = NeuralSPDE(dim=1, in_channels=1, noise_channels=1, hidden_channels=_dh, 
-                   n_iter=_iter, modes1=_modes1, modes2=_modes2).cuda()
-
-        nb_params = count_params(model)
-        
-        print('\n The model has {} parameters'. format(nb_params))
-
-        # Train the model. The best model is checkpointed.
-        _, _, _ = train_nspde(model, train_dl, val_dl, device, loss, batch_size=20, epochs=epochs, learning_rate=lr, scheduler_step=500, scheduler_gamma=0.5, plateau_patience=plateau_patience, plateau_terminate=plateau_terminate, print_every=print_every, checkpoint_file=checkpoint_file)
-        
-        # load the best trained model 
-        model.load_state_dict(torch.load(checkpoint_file))
-        
-        # compute the test loss 
-        loss_test = eval_nspde(model, test_dl, loss, 20, device)
-
-        # we also recompute the validation and train loss
-        loss_train = eval_nspde(model, train_dl, loss, 20, device)
-        loss_val = eval_nspde(model, val_dl, loss, 20, device)
-
-        # if this configuration of hyperparameters is the best so far (determined wihtout using the test set), save it 
-        if loss_val < best_loss_val:
-            torch.save(model.state_dict(), final_checkpoint_file)
-            best_loss_val = loss_val
-
-        # write results
-        with open(log_file, 'a', encoding='UTF8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([_dh, _iter, _modes1, _modes2, nb_params, loss_train, loss_val, loss_test])
-
-
 def hyperparameter_search_nspde_2d(train_dl, val_dl, test_dl, solver, d_h=[32], iter=[1, 2, 3], modes1=[32, 64], modes2=[32, 64],
                                 epochs=500, print_every=20, lr=0.025, plateau_patience=100, plateau_terminate=100,
                                 log_file='log_nspde', checkpoint_file='checkpoint.pt',

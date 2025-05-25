@@ -11,8 +11,8 @@ interpolation: 'linear'
 
 depth: 2
 window_length: 3
-hidden_channels: 8
-solver: 'euler'
+hidden_channels: 8   # 8, [8, 16, 32]
+solver: 'euler'   # 'euler', ['euler', 'rk4']
 
 ntrain: 840
 nval: 180
@@ -33,3 +33,5 @@ seed: 3407
 
 save_dir: '../result/${model}_${equation}/'
 checkpoint_file: '${data}.pth'
+
+log_file: '${data}_log'

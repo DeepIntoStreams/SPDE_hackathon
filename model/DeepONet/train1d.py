@@ -81,30 +81,92 @@ def train(config):
     print('loss_test (model saved in checkpoint):', loss_test)
 
 
-def hyperparameter_tuning(data_path, ntrain, nval, ntest, batch_size, epochs, learning_rate,
-                 plateau_patience, plateau_terminate, print_every,
-                 dim_x, T, sub_t, normalizer,
-                 width, branch_depth, trunk_depth,
-                 log_file, checkpoint_file, final_checkpoint_file):
+def hyperparameter_search(config):
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
+    tmp_checkpoint_file = config.save_dir + 'tmp_checkpoint.pth'
 
-    data = scipy.io.loadmat(data_path)
-    O_X, O_T, W, Sol = data['X'], data['T'], data['W'], data['sol']
+    # Load data
+    data = scipy.io.loadmat(config.data_path)
+    W, Sol = data['W'], data['sol']
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
-    _, test_dl, norm, grid = dataloader_deeponet_1d_xi(u=data, xi=xi, ntrain=ntrain + nval,
-                                                       ntest=ntest, T=T, sub_t=sub_t,
-                                                       batch_size=batch_size, dim_x=dim_x, normalizer=normalizer)
 
-    train_dl, val_dl, norm, grid = dataloader_deeponet_1d_xi(u=data[:ntrain + nval], xi=xi[:ntrain + nval],
-                                                             ntrain=ntrain, ntest=nval, T=T, sub_t=sub_t,
-                                                             batch_size=batch_size, dim_x=dim_x, normalizer=normalizer)
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
-    hyperparameter_search_deeponet(train_dl, val_dl, test_dl, dim_x * (T - 1), grid, norm,
-                                   width=width, branch_depth=branch_depth, trunk_depth=trunk_depth,
-                                   lr=learning_rate, epochs=epochs, print_every=print_every, plateau_patience=plateau_patience,
-                                   plateau_terminate=plateau_terminate, log_file=log_file + '.csv',
-                                   checkpoint_file=checkpoint_file,
-                                   final_checkpoint_file=final_checkpoint_file)
+    train_loader, test_loader, norm, grid = dataloader_deeponet_1d_xi(u=data, xi=xi,
+                                                                      ntrain=ntrain,
+                                                                      ntest=ntest,
+                                                                      T=config.T,
+                                                                      sub_t=config.sub_t,
+                                                                      batch_size=config.batch_size,
+                                                                      dim_x=config.dim_x,
+                                                                      normalizer=config.normalizer)
+    _, val_loader, _, _ = dataloader_deeponet_1d_xi(u=data[:ntrain + nval],
+                                                    xi=xi[:ntrain + nval],
+                                                    ntrain=ntrain,
+                                                    ntest=nval,
+                                                    T=config.T,
+                                                    sub_t=config.sub_t,
+                                                    batch_size=config.batch_size,
+                                                    dim_x=config.dim_x,
+                                                    normalizer=config.normalizer)
+
+    hyperparams = list(itertools.product(config.width, config.branch_depth, config.trunk_depth))
+
+    loss = LpLoss(size_average=False)
+
+    fieldnames = ['width', 'branch_depth', 'trunk_depth', 'nb_params', 'loss_train', 'loss_val', 'loss_test']
+    log_file = config.save_dir + config.log_file
+    with open(log_file, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(fieldnames)
+
+    best_loss_val = 1000.
+
+    for (w, bd, td) in hyperparams:
+
+        print('\n width:{}, branch depth:{},  trunk depth:{}'.format(w, bd, td))
+
+        S = config.dim_x * (config.T - 1)
+        branch = [S] + bd * [w]
+        trunk = [grid.shape[-1]] + td * [w]
+        model = DeepONetCP(branch_layer=branch, trunk_layer=trunk).to(device)
+        nb_params = count_params(model)
+        print('\n The model has {} parameters'.format(nb_params))
+
+        # Train the model. The best model is checkpointed.
+        _, _, _ = train_deepOnet_1d(model, train_loader, val_loader,
+                                    grid, norm, device, loss,
+                                    batch_size=config.batch_size,
+                                    epochs=config.epochs,
+                                    learning_rate=config.learning_rate,
+                                    plateau_patience=config.plateau_patience,
+                                    plateau_terminate=config.plateau_terminate,
+                                    delta=config.delta,
+                                    print_every=config.print_every,
+                                    checkpoint_file=tmp_checkpoint_file)
+
+        # load the best trained model
+        model.load_state_dict(torch.load(tmp_checkpoint_file))
+        loss_train = eval_deeponet(model, train_loader, loss, config.batch_size, device, grid, norm)
+        loss_val = eval_deeponet(model, val_loader, loss, config.batch_size, device, grid, norm)
+        loss_test = eval_deeponet(model, test_loader, loss, config.batch_size, device, grid, norm)
+        print('loss_train (model saved in tmp_checkpoint):', loss_train)
+        print('loss_val (model saved in tmp_checkpoint):', loss_val)
+        print('loss_test (model saved in tmp_checkpoint):', loss_test)
+
+        # if this configuration of hyperparameters is the best so far (determined wihtout using the test set), save it
+        if loss_val < best_loss_val:
+            torch.save(model.state_dict(), checkpoint_file)
+            best_loss_val = loss_val
+
+        # write results
+        with open(log_file, 'a', encoding='UTF8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([w, bd, td, nb_params, loss_train, loss_val, loss_test])
+
+    print('Best model saved in:', checkpoint_file)
 
 
 @hydra.main(version_base=None, config_path="../config/", config_name="deeponet")
@@ -123,7 +185,7 @@ def main(cfg: DictConfig):
     torch.backends.cudnn.benchmark = False
 
     train(cfg)
-    # hyperparameter_tuning(**cfg.tuning)
+    # hyperparameter_search(cfg)
 
 
 if __name__ == '__main__':

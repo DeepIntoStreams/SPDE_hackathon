@@ -7,10 +7,10 @@ dim_x: 128
 T: 51
 sub_t: 1
 
-hidden_channels: 32
-n_iter: 1  # [1, 2, 3, 4]
-modes1: 64  # [32, 64]
-modes2: 50  # [32, 50]
+hidden_channels: 32   # 32, [32]
+n_iter: 1   # 1, [1, 2, 3, 4]
+modes1: 64   # 64, [32, 64]
+modes2: 50   # 50, [32, 50]
 
 ntrain: 840
 nval: 180
@@ -31,3 +31,5 @@ seed: 3407
 
 save_dir: '../result/${model}_${equation}/'
 checkpoint_file: '${data}.pth'
+
+log_file: '${data}_log'

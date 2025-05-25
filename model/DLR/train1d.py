@@ -23,22 +23,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def mytrain(config):
 
-    os.makedirs(config.base_dir, exist_ok=True)
-    checkpoint_file = config.base_dir + config.checkpoint_file
-
-    # Set random seed
-    seed = config.seed
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = config.save_dir + config.checkpoint_file
 
     data = scipy.io.loadmat(config.data_path)
     data['T'] = data['T'].squeeze()
     data['X'] = data['X'].squeeze()
+    data['W'] = data['W'].transpose(0,2,1)
+    data['Soln_add'] = data['sol'].transpose(0,2,1)
+    data['U0'] = data['Soln_add'][:,0,:]
 
     ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
 
@@ -141,7 +134,19 @@ def mytrain(config):
 
 @hydra.main(version_base=None, config_path="../config/", config_name="dlr_phi41")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Set random seed
+    seed = cfg.seed
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     mytrain(cfg)
 
 

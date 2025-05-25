@@ -1,17 +1,17 @@
 model: FNO
 equation: NS
-data: NS_u0_xi_trc128
+data: NS_xi_trc128
 
 data_path: '../../data_gen/results/${data}/merged_ns_1200.mat'
 sub_x: 1
 T: 100
 sub_t: 1
 
-L: 4  # [3, 4]  # iter
-modes1: 8  # [8, 16]
+L: 4  # 4, [3, 4]  # iter
+modes1: 8  # 8, [8, 16]
 modes2: 8
 modes3: 8
-width: 8  # d_h 32
+width: 32  # d_h 32
 
 ntrain: 840
 nval: 180
@@ -30,4 +30,4 @@ seed: 3407
 save_dir: '../result/${model}_${equation}/'
 checkpoint_file: '${data}.pth'
 
-
+log_file: '${data}_log'
