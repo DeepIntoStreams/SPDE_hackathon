@@ -11,8 +11,10 @@ interpolation: 'linear'
 
 depth: 2
 window_length: 3
-hidden_channels: 8   # 8, [8, 16, 32]
-solver: 'euler'   # 'euler', ['euler', 'rk4']
+hidden_channels: 8   # grid search: [8, 16, 32]
+# Used in SPDEBench: Phi41+sigma01:8, Phi41+sigma1:16
+solver: 'euler'   # grid search: ['euler', 'rk4']
+# Used in SPDEBench: Phi41+sigma01:'euler', Phi41+sigma1:'euler'
 
 ntrain: 840
 nval: 180

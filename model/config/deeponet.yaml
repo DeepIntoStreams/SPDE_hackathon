@@ -8,9 +8,12 @@ T: 51
 sub_t: 1
 normalizer: True
 
-width: 512  # [128, 256, 512]
-branch_depth: 3  # [2, 3, 4]
-trunk_depth: 3  # [2, 3, 4]
+width: 512  # grid search: [128, 256, 512]
+# Used in SPDEBench: Phi41+sigma01:512, Phi41+sigma1:128
+branch_depth: 3  # grid search: [2, 3, 4]
+# Used in SPDEBench: Phi41+sigma01:3, Phi41+sigma1:4
+trunk_depth: 3  # grid search: [2, 3, 4]
+# Used in SPDEBench: Phi41+sigma01:3, Phi41+sigma1:3
 
 ntrain: 840
 nval: 180

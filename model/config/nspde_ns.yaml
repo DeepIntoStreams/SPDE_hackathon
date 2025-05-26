@@ -7,9 +7,11 @@ sub_x: 1
 T: 100
 sub_t: 1
 
-hidden_channels: 32   # 32  # [32]
-n_iter: 1  # 1  # [1,2,3,4]
-modes: [16,16,16]    # [16,16,16]  # [[16,16,16],[8,8,8]]
+hidden_channels: 32   # grid search: [32]
+n_iter: 1  # grid search: [1,2,3,4]
+# Used in SPDEBench: NS:1
+modes: [16,16,16]    # grid search: [[16,16,16],[8,8,8]]
+# Used in SPDEBench: NS:[16,16,16]
 solver: 'fixed_point'
 
 ntrain: 840

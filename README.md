@@ -79,8 +79,9 @@ python train1d.py
 - `plateau_terminate`: Early stop the training if validation loss doesn't improve after such number of epochs.
 - `delta`: Minimum threshold for improvement.
 - `print_every`: Training log frequency.
-- `base_dir`: Directory where output files (i.e. checkpoints) will be saved.
+- `save_dir`: Directory where output files (i.e. checkpoints) will be saved.
 - `checkpoint_file`: File name of model checkpoints (.pth).
+- `log_file`: File where results of hyperparameter search will be logged.
 
 (More details about the config args will be added later.)
 
@@ -147,9 +148,7 @@ SPDE_hackathon
     │       
     ├───DeepONet
     │       deepOnet.py
-    │       deepOnet2D.py
     │       train1d.py
-    │       train2d.py
     │       
     ├───DLR
     │       Graph.py
@@ -157,8 +156,8 @@ SPDE_hackathon
     │       RSlayer_2d.py
     │       Rule.py
     │       SPDEs.py
-    │       train1d_phi41.py
-    │       train2d_NS.py
+    │       train1d.py
+    │       train2d.py
     │       utils.py
     │       utils2d.py
     │       
@@ -174,7 +173,6 @@ SPDE_hackathon
     │       
     ├───NCDEFNO
     │       NCDEFNO_1D.py
-    │       NCDEFNO_2D.py
     │       train1d.py
     │       
     ├───NRDE
@@ -186,12 +184,12 @@ SPDE_hackathon
             fixed_point_solver.py
             gradients.py
             linear_interpolation.py
-            neural_spde.py
             neural_aeps_spde.py
+            neural_spde.py
             Noise.py
-            SPDEs2D.py
-            root_finding_algorithms.py
             root_find_solver.py
+            root_finding_algorithms.py
+            SPDEs2D.py
             train1d.py
             train2d.py
             train2d_aeps.py

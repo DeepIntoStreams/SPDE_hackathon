@@ -7,11 +7,13 @@ sub_x: 1
 T: 100
 sub_t: 1
 
-L: 4  # 4, [3, 4]  # iter
-modes1: 8  # 8, [8, 16]
+L: 4  # grid search: [3, 4]
+# Used in SPDEBench: NS:3
+modes1: 8  # grid search: [8, 16]
+# Used in SPDEBench: NS:8
 modes2: 8
 modes3: 8
-width: 32  # d_h 32
+width: 32  # grid search: [32]
 
 ntrain: 840
 nval: 180
