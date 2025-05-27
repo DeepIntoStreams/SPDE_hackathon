@@ -2,9 +2,8 @@ numpy
 scipy
 hydra-core
 omegaconf
-torch
 torchcde==0.2.5
-signatory
+signatory==1.2.6.1.9.0
 scikit-learn
 tqdm
 pandas

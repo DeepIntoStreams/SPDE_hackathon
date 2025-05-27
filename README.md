@@ -17,8 +17,13 @@ Below, we provide instructions on how to use code in this repository to generate
 
 ## Requirements
 
-To install requirements:
+The code has been tested with Python 3.8 and PyTorch 2.4.1 (CUDA 11.8). For Linux users, we recommend installing PyTorch with the following command:
+```setup
+conda install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1  pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+Alternatively, you can refer to the [official PyTorch website](https://pytorch.org/get-started/previous-versions/) for other installation options.
 
+To install the remaining dependencies:
 ```setup
 pip install -r requirements.txt
 ```
