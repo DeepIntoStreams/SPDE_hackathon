@@ -81,8 +81,7 @@ def cacheXiFeature_2d(graph, T, X, Y, W, eps, device, batch_size = 100):
 
 def mat2data(reader, sub_t, sub_x):
     data = {}
-    data['T'] = reader.read_field('t').squeeze()[:1000:10 * sub_t].squeeze()  # if data['t'] was not downsampled before
-    # data['T'] = reader.read_field('t').squeeze()
+    data['T'] = reader.read_field('t').squeeze()[:1000:10 * sub_t].squeeze()  # data['t'] was not downsampled before
     data['Solution'] = reader.read_field('sol')
     data['W'] = reader.read_field('forcing')
     spoints = np.linspace(0, 1, data['W'].shape[1] // sub_x)
@@ -146,19 +145,19 @@ def dataloader_2d(u, xi=None, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4):
     if xi is None:
         print('There is no known forcing')
 
-    u0_train = u[:ntrain, ::sub_x, ::sub_x, 0]  # .unsqueeze(1)
+    u0_train = u[:ntrain, ::sub_x, ::sub_x, 0]
     u_train = u[:ntrain, ::sub_x, ::sub_x, :T:sub_t]
 
     if xi is not None:
-        xi_train = xi[:ntrain, ::sub_x, ::sub_x, 0:T:sub_t]  # .unsqueeze(1)
+        xi_train = xi[:ntrain, ::sub_x, ::sub_x, 0:T:sub_t]
     else:
         xi_train = torch.zeros_like(u_train)
 
-    u0_test = u[-ntest:, ::sub_x, ::sub_x, 0]  # .unsqueeze(1)
+    u0_test = u[-ntest:, ::sub_x, ::sub_x, 0]
     u_test = u[-ntest:, ::sub_x, ::sub_x, 0:T:sub_t]
 
     if xi is not None:
-        xi_test = xi[-ntest:, ::sub_x, ::sub_x, 0:T:sub_t]  # .unsqueeze(1)
+        xi_test = xi[-ntest:, ::sub_x, ::sub_x, 0:T:sub_t]
     else:
         xi_test = torch.zeros_like(u_test)
 
@@ -228,14 +227,8 @@ def test(model, device, test_loader, criterion, epoch=None):
     with torch.no_grad():
         for batch_idx, (W, U0, F_Xi, Y) in enumerate(test_loader):
             W, U0, F_Xi, Y = W.to(device), U0.to(device), F_Xi.to(device), Y.to(device)
-            # print('batch_idx', batch_idx, ' | W[0,:5,1,1]:', W[0,:5,8,8])
-            # print('batch_idx', batch_idx, ' | U0[0,1,1]:', U0[0,8,8])
-            # print('batch_idx', batch_idx, ' | F_Xi[1,:5,1,1]:', F_Xi[1,:5,8,8,:5])
-            # print('batch_idx', batch_idx, ' | Y[1,:5,1,1]:', Y[1,:5,8,8])
             output = model(U0, W, F_Xi)
-            # print('batch_idx', batch_idx, ' | output[1,:5,1,1]:', output[1,:5,8,8])
             loss = criterion(output[:, 1:, ...], Y[:, 1:, ...])
-            # print('loss', loss)
             test_loss += loss.item()
         # saveplot(output, Y, epoch)
     return test_loss / len(test_loader.dataset)

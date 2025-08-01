@@ -1,10 +1,6 @@
 import os
 import os.path as osp
 import sys
-
-current_directory = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(osp.join(current_directory, "..",".."))
-
 import torch
 import scipy.io
 import h5py
@@ -20,6 +16,8 @@ from matplotlib.ticker import MaxNLocator
 from functools import reduce
 from functools import partial 
 from timeit import default_timer
+current_directory = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(osp.join(current_directory, "..",".."))
 from model.NSPDE.neural_aeps_spde import NeuralSPDE
 
 #===========================================================================
@@ -58,37 +56,6 @@ def dataloader_nspde_1d(u, xi=None, ntrain=1000, ntest=200, T=51, sub_t=1, batch
     test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_test, xi_test, u_test), batch_size=batch_size, shuffle=False)
 
     return train_loader, test_loader
-
-# def dataloader_nspde_diffeq_1d(u, xi=None, ntrain=1000, ntest=200, T=51, sub_t=1, batch_size=20, dim_x=128, dataset=None):
-
-#     if xi is None:
-#         print('There is no known forcing')
-
-#     if dataset=='phi41':
-#         T, sub_t = 51, 1
-#     elif dataset=='wave':
-#         T, sub_t = (u.shape[-1]+1)//2, 5
-
-#     u0_train = u[:ntrain, :dim_x, 0].unsqueeze(1)
-#     u_train = u[:ntrain, :dim_x, :T:sub_t]
-
-#     if xi is not None:
-#         xi_train = xi[:ntrain, :dim_x, 0:T:sub_t].unsqueeze(1)
-#     else:
-#         xi_train = torch.zeros_like(u_train)
-
-#     u0_test = u[-ntest:, :dim_x, 0].unsqueeze(1)
-#     u_test = u[-ntest:, :dim_x, 0:T:sub_t]
-
-#     if xi is not None:
-#         xi_test = xi[-ntest:, :dim_x, 0:T:sub_t].unsqueeze(1)
-#     else:
-#         xi_test = torch.zeros_like(u_test)
-
-#     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_train, xi_train, u_train), batch_size=batch_size, shuffle=True)
-#     test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_test, xi_test, u_test), batch_size=batch_size, shuffle=False)
-
-#     return train_loader, test_loader
 
 
 def dataloader_nspde_2d(u, xi, a_eps, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4, batch_size=20, dataset=None):
@@ -402,76 +369,6 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-#===============================================================================
-# Plot solution at different time steps (1D)
-#===============================================================================
-def plot_1d(model, data_loader, device, i=1, T_=10, T=51, a=0):
-
-    for u0_, xi_, u_ in data_loader:
-        u0_ = u0_.to(device)
-        xi_ = xi_.to(device)
-        u_ = u_.to(device)
-        break
-
-    with torch.no_grad():
-        u_pred = model(u0_,xi_)
-
-    fig, ax = plt.subplots(1, T_, figsize=(T_*3, 3))
-
-    times = np.linspace(a, T-1, T_)
-    for j in range(T_):
-        t = int(times[j])
-        ax[j].plot(u_[i,...,t].detach().cpu().numpy(),label='true')
-        ax[j].plot(u_pred[i,0,...,t].detach().cpu().numpy(),label='pred')
-        ax[j].set_title(f'time step {j+1}')
-
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def create_subtitle(fig: plt.Figure, grid: SubplotSpec, title: str):
-    "Sign sets of subplots with title"
-    row = fig.add_subplot(grid)
-    # the '\n' is important
-    row.set_title(f'{title}\n', fontweight='bold', fontsize=34)
-    # hide subplot
-    row.set_frame_on(False)
-    row.axis('off')
-
-def contour_plot_1d(model, data_loader, device, O_X, O_T, save_file=None):
-    
-    mpl.rcParams['xtick.major.pad'] = 8
-    mpl.rcParams['ytick.major.pad'] = 8
-    fig, ax = plt.subplots(2, 3, figsize=(20,10))
-    x_m, t_m = np.meshgrid(O_T, O_X)
-
-    for u0_, xi_, u_ in data_loader:
-        u0_ = u0_.to(device)
-        xi_ = xi_.to(device)
-        u_ = u_.to(device)
-        break
-
-    with torch.no_grad():
-        u_pred = model(u0_,xi_)
-
-    for i in range(3):
-        ax[0][i].contourf(x_m,t_m, u_[i].cpu().numpy(), 50, cmap=plt.cm.jet)
-        ax[1][i].contourf(x_m,t_m, u_pred[i,0,...].cpu().numpy(), 50, cmap=plt.cm.jet)
-        ax[0][i].set_xlabel('t')
-        ax[0][i].set_ylabel('x')
-        ax[1][i].set_xlabel('t')
-        ax[1][i].set_ylabel('x')
-
-    grid = plt.GridSpec(2, 3)
-    create_subtitle(fig, grid[0, ::], 'Ground truth solutions')
-    create_subtitle(fig, grid[1, ::], 'Predicted solutions with the Neural SPDE model')
-    plt.tight_layout()
-
-    if save_file is not None:
-        plt.savefig(save_file,bbox_inches='tight')
-
-    plt.show()
-
 
 #===============================================================================
 # Utilities (adapted from https://github.com/zongyi-li/fourier_neural_operator)
@@ -670,112 +567,3 @@ def count_params(model):
         c += reduce(operator.mul, list(p.size()))
     return c
 
-
-#===========================================================================
-# The following utilities are for memory usage profiling
-#===========================================================================
-def get_gpu_mem(synchronize=True, empty_cache=True):
-    return torch.cuda.memory_allocated(), torch.cuda.memory_cached()
-
-
-def generate_mem_hook(handle_ref, mem, idx, hook_type, exp):
-    def hook(self, *args):
-        if len(mem) == 0 or mem[-1]["exp"] != exp:
-            call_idx = 0
-        else:
-            call_idx = mem[-1]["call_idx"] + 1
-
-        mem_all, mem_cached = get_gpu_mem()
-        torch.cuda.synchronize()
-        mem.append({
-            'layer_idx': idx,
-            'call_idx': call_idx,
-            'layer_type': type(self).__name__,
-            'exp': exp,
-            'hook_type': hook_type,
-            'mem_all': mem_all,
-            'mem_cached': mem_cached,
-        })
-
-    return hook
-
-
-def add_memory_hooks(idx, mod, mem_log, exp, hr):
-    h = mod.register_forward_pre_hook(generate_mem_hook(hr, mem_log, idx, 'pre', exp))
-    hr.append(h)
-
-    h = mod.register_forward_hook(generate_mem_hook(hr, mem_log, idx, 'fwd', exp))
-    hr.append(h)
-
-    h = mod.register_backward_hook(generate_mem_hook(hr, mem_log, idx, 'bwd', exp))
-    hr.append(h)
-
-def log_mem(model, inp, mem_log=None, exp=None, model_type='NSPDE'):
-    mem_log = mem_log or []
-    exp = exp or f'exp_{len(mem_log)}'
-    hr = []
-    for idx, module in enumerate(model.modules()):
-        add_memory_hooks(idx, module, mem_log, exp, hr)
-        
-    try:
-        if model_type in ['NSPDE', 'NCDE']:
-            out = model(inp[0], inp[1])
-        else:
-            out = model(inp)
-        
-        loss = out.sum()
-        loss.backward()
-  
-    finally:
-        [h.remove() for h in hr]
-
-        return mem_log
-
-
-def plot_mem(df, exps=None, normalize_call_idx=True, normalize_mem_all=True, filter_fwd=False, return_df=False, output_file=None):
-    if exps is None:
-        exps = df.exp.drop_duplicates()
-
-    fig, ax = plt.subplots(figsize=(20, 10))
-    for exp in exps:
-        df_ = df[df.exp == exp]
-
-        if normalize_call_idx:
-            df_.call_idx = df_.call_idx / df_.call_idx.max()
-
-        if normalize_mem_all:
-            df_.mem_all = df_.mem_all - df_[df_.call_idx == df_.call_idx.min()].mem_all.iloc[0]
-            df_.mem_all = df_.mem_all // 2 ** 20
-
-        if filter_fwd:
-            layer_idx = 0
-            callidx_stop = df_[(df_["layer_idx"] == layer_idx) & (df_["hook_type"] == "fwd")]["call_idx"].iloc[0]
-            df_ = df_[df_["call_idx"] <= callidx_stop]
-            # df_ = df_[df_.call_idx < df_[df_.layer_idx=='bwd'].call_idx.min()]
-
-        plot = df_.plot(ax=ax, x='call_idx', y='mem_all', label=exp)
-        print('Maximum memory: {} MB'.format(df_['mem_all'].max()))
-        if output_file:
-            plot.get_figure().savefig(output_file)
-
-    if return_df:
-        return df_
-
-
-
-#===========================================================================
-# The following utility returns the maximum memory usage
-#===========================================================================
-
-def get_memory(device, reset=False, in_mb=True):
-    if device is None:
-        return float('nan')
-    if device.type == 'cuda':
-        if reset:
-            torch.cuda.reset_max_memory_allocated(device)
-        bytes = torch.cuda.max_memory_allocated(device)
-        if in_mb:
-            bytes = bytes / 1024 / 1024
-        return bytes
-    else:
-        return float('nan')

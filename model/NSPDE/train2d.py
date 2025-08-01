@@ -34,10 +34,11 @@ def train(config):
     print('data shape:')
     print(W.shape)
     print(Sol.shape)
-    # indices = np.random.permutation(Sol.shape[0])
-    # print('indices:', indices[:10])
-    # Sol = Sol[indices]
-    # W = W[indices]
+
+    indices = np.random.permutation(Sol.shape[0])
+    print('indices:', indices[:10])
+    Sol = Sol[indices]
+    W = W[indices]
 
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))
@@ -107,10 +108,10 @@ def hyperparameter_search(config):
     print('data shape:')
     print(W.shape)
     print(Sol.shape)
-    # indices = np.random.permutation(Sol.shape[0])
-    # print('indices:', indices[:10])
-    # Sol = Sol[indices]
-    # W = W[indices]
+    indices = np.random.permutation(Sol.shape[0])
+    print('indices:', indices[:10])
+    Sol = Sol[indices]
+    W = W[indices]
 
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))

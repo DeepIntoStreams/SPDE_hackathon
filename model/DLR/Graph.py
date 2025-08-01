@@ -74,16 +74,8 @@ class Graph():
         if extra_planted is not None:
             model.update(extra_planted)
             planted = planted.union(sorted(extra_planted.keys()))
-            # planted = planted.union(set(extra_planted.keys()))
-            # for key in extra_deg.keys():
-            #     if 'u_0' in key:
-            #         graph.update({'u_0' : {}})
-            # graph.update({key: {'u_0' : 1} if 'u_0' in key else {} for key in extra_deg.keys()})
             graph.update({key: {} for key in extra_deg.keys()})
-            # graph.update(extra_deg)
-            # print(planted)
             done.update(extra_deg)
-            # print(done)
         # If necessary add spatial derivative of the I[xi] denoted by I'[xi]
         if self.derivative:
             planted.add("I'[xi]")
@@ -99,7 +91,6 @@ class Graph():
             for k in range(1, self.R.max + 1):  # k is the number of trees multiplied
                 # check all possible combinations of product of k planted trees
                 for words in comb(sorted(planted), k):
-                    # for words in comb([w for w in planted], k):
                     tree, dic = self.R.words_to_tree(words)  # create one tree product out of the list of trees
                     temp_deg = self.tree_deg(dic, done)  # compute the degree of this tree
                     # check if the tree needs to be added. k <= self.R.free_num checks if the product of k trees can exist
@@ -127,7 +118,6 @@ class Graph():
                                 # integrate trees from the previous iteration.
             this_round = self.I(model, planted, self.R.exceptions, self.derivative)
             keys = [tree for tree in sorted(this_round.keys()) if tree not in self.R.degrees and tree not in planted]
-            # keys = [tree for tree in this_round.keys() if tree not in self.R.degrees and tree not in planted]
             # include theese integrated trees to the model. Don't include trees that are not of the form I[\tau]
             for IZ in keys:
                 if IZ[1] == "[":
@@ -214,7 +204,6 @@ class Graph():
         if extra_planted is not None:
             model.update(extra_planted)
             planted = planted.union(sorted(extra_planted.keys()))
-            # planted = planted.union(set(extra_planted.keys()))
             graph.update({key: {} for key in extra_deg.keys()})
             done.update(extra_deg)
             if self.derivative:
@@ -245,7 +234,6 @@ class Graph():
             for k in range(1, self.R.max + 1):  # k is the number of trees multiplied
                 # check all possible combinations of product of k planted trees
                 for words in comb(sorted(planted), k):
-                    # for words in comb([w for w in planted], k):
                     tree, dic = self.R.words_to_tree(words)  # create one tree product out of the list of trees
                     temp_deg = self.tree_deg(dic, done)  # compute the degree of this tree
                     # check if the tree needs to be added. k <= self.R.free_num checks if the product of k trees can exist
@@ -274,7 +262,6 @@ class Graph():
                                 # integrate trees from the previous iteration.
             this_round = self.I(model, planted, self.R.exceptions, self.derivative)
             keys = [tree for tree in sorted(this_round.keys()) if tree not in self.R.degrees and tree not in planted]
-            # keys = [tree for tree in this_round.keys() if tree not in self.R.degrees and tree not in planted]
 
             # include theese integrated trees to the model. Don't include trees that are not of the form I[\tau]
             for IZ in keys:

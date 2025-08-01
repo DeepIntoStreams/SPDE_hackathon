@@ -65,24 +65,10 @@ class SPDE2D():
         return np.linspace(a, b, int((b - a) / dx) + 1)
 
 
-    def Solve(self, W):
-        # if self.type == "E" or self.type == "Elliptic":
-        #     return self.Elliptic(W)
-        if self.type == "P" or self.type == "Parabolic":
-            return self.Parabolic(W)
-        # if self.type == "W" or self.type == "Wave":
-        #     return self.Wave(W)
-        # if self.type == "B" or self.type == "Burgers":
-        #     return self.Burgers(W)
-    
-
     # Calculat the matirx F = u_n + \mu(u_n)*dt + \sigma(\mu_n)*dW_n
     def Matrix_F(self, W, un, n, dW, dt):
         # n: the time step
         # un: u_n
-
-        # Extract specae-time increments and dW
-        # dW, dx, dy, dt = self.initialization(W, T, X, Y, diff)
 
         F = np.zeros((W.shape[0], W.shape[2] , W.shape[3] ))
         for i in range(W.shape[0]):
@@ -94,7 +80,6 @@ class SPDE2D():
     # Define the matrix A := \Delta_x * dt / dx ** 2
     def Matrix_A (self, dx, dt, len_X):
         J = len_X
-        # dW, dx, dy, dt = self.initialization(W, T, X, Y)
         A = np.diag(-2 * np.ones(J)) + np.diag(np.ones(J - 1), k=1) + np.diag(np.ones(J - 1), k=-1)
         A[0, J-1] = 1
         A[J-1, 0] = 1 
@@ -105,7 +90,6 @@ class SPDE2D():
     # Definr the matrix B := \Delta_y * dt / dy ** 2
     def Matrix_B (self, dy, dt, len_Y):
         K = len_Y
-        # dW, dx, dy, dt = self.initialization(W, T, X, Y)
         B = np.diag(-2 * np.ones(K)) + np.diag(np.ones(K - 1), k=1) + np.diag(np.ones(K - 1), k=-1)
         B[0, K-1] = 1
         B[K-1, 0] = 1 
