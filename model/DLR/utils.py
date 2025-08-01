@@ -111,11 +111,6 @@ class rsnet(nn.Module):
             nn.GELU(),
             nn.Linear(32, 1)
         )
-        # self.down1 = nn.Sequential(
-        #     nn.Conv1d(self.T * self.F, 32 * self.T, kernel_size=1, groups = self.T),
-        #     nn.GELU(),
-        #     nn.Conv1d(32 * self.T, self.T, kernel_size = 1, groups = self.T)
-        # )
         self.L = 4
         self.padding = 6
         modes1, modes2, width = 16, 16, 8  # 32, 24, 32

@@ -17,7 +17,6 @@ class Noise2D(object):
     def partition_2d(self, a, b, dx, c, d, dy):  # makes a partition of [a,b]×[c,d] of equal sizes dx, dy
         X = np.linspace(a, b, int((b - a) / dx) + 1)
         Y = np.linspace(c, d, int((d - c) / dy) + 1)
-        # xx, yy = np.meshgrid(X, Y, indexing='ij')
         return X, Y
 
     # Create 1 dimensional Brownian motion with time step = dt

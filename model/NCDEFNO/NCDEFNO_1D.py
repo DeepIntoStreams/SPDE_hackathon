@@ -84,7 +84,6 @@ class NeuralCDE(torch.nn.Module):
         self.func = CDEFunc(noise_size, hidden_channels)
         self.initial = torch.nn.Linear(data_size, hidden_channels)
         
-        # self.readout = torch.nn.Linear(hidden_channels, output_channels)
         readout = [torch.nn.Linear(hidden_channels, 128), torch.nn.ReLU(), torch.nn.Linear(128, output_channels)]
         self._readout = torch.nn.Sequential(*readout)
         self.interpolation = interpolation
@@ -240,16 +239,10 @@ def dataloader_ncdeinf_1d(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, batch_si
     u_train = u[:ntrain, :dim_x, 0:T:sub_t].permute(0, 2, 1).unsqueeze(1) #(N, 1, dim_t, dim_x)
     xi_train = xi[:ntrain, :dim_x, 0:T:sub_t].permute(0, 2, 1).unsqueeze(1) #(N, 1, dim_t, dim_x)
 
-    t = torch.linspace(0., T, T)[None, None, :, None].repeat(ntrain, 1, 1, dim_x) #(N, 1, dim_t, dim_x)
-    # xi_train = torch.cat([t, xi_train], dim=1)  #(N, 2, dim_t, dim_x)
-
-    u_test = u[-ntest:, :dim_x, 0:T:sub_t].permute(0, 2, 1).unsqueeze(1) 
+    u_test = u[-ntest:, :dim_x, 0:T:sub_t].permute(0, 2, 1).unsqueeze(1)
     xi_test = xi[-ntest:, :dim_x, 0:T:sub_t].permute(0, 2, 1).unsqueeze(1) 
 
-    t = torch.linspace(0., T, T)[None, None, :, None].repeat(ntest, 1, 1, dim_x)
-    # xi_test = torch.cat([t, xi_test],dim=1)
-
-    u0_train = u_train[:, :, 0] #(N, 1, dim_x)  
+    u0_train = u_train[:, :, 0] #(N, 1, dim_x)
     u0_test = u_test[:, :, 0]  #(N, 1, dim_x)
 
     # interpolation 
@@ -284,7 +277,6 @@ def eval_ncdeinf_1d(model, test_dl, myloss, batch_size, device):
             u_pred = model(u0_, xi_)
             loss = myloss(u_pred[:, :, 1:, :].reshape(batch_size, -1), u_[:, :, 1:, :].reshape(batch_size, -1))
             test_loss += loss.item()
-    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 def train_ncdeinf_1d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20, plateau_patience=None, delta=0, plateau_terminate=None, checkpoint_file='checkpoint.pt'):

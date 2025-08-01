@@ -241,10 +241,6 @@ def plot_2d_u0xi(model, data_loader, device, i=1, T_=5, T=100, a=0):
 
         vmin = min(u_[i].min(), u_pred[i].min()).detach().cpu().numpy()
         vmax = max(u_[i].max(), u_pred[i].max()).detach().cpu().numpy()
-        # vmin1 = u_[i].min().detach().cpu().numpy()
-        # vmax1 = u_[i].max().detach().cpu().numpy()
-        # vmin2 = u_pred[i].min().detach().cpu().numpy()
-        # vmax2 = u_pred[i].max().detach().cpu().numpy()
 
         times = [0,20,40,60,80,99]
         # times = np.linspace(a, T-1, T_)

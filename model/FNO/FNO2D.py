@@ -82,7 +82,6 @@ class FNO_layer(nn.Module):
 
         self.conv = SpectralConv3d(width, width, modes1, modes2, modes3)
         self.w = nn.Conv3d(width, width, 1)
-        # self.bn = torch.nn.BatchNorm2d(width)
 
     def forward(self, x):
         """ x: (batch, hidden_channels, dim_x, dim_y, dim_t)"""
@@ -137,25 +136,6 @@ class FNO_space2D_time(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
         x = F.pad(x, [0, self.padding])  # pad the domain if input is non-periodic
-
-        # x1 = self.conv0(x)
-        # x2 = self.w0(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv1(x)
-        # x2 = self.w1(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv2(x)
-        # x2 = self.w2(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv3(x)
-        # x2 = self.w3(x)
-        # x = x1 + x2
 
         x = self.net(x)
 
@@ -326,5 +306,4 @@ def eval_fno_2d(model, test_dl, myloss, batch_size, device):
             u_pred = u_pred[..., 0]
             loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
             test_loss += loss.item()
-    # print('Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest

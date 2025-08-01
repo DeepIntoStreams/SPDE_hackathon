@@ -206,8 +206,8 @@ def main(cfg: DictConfig):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    # run_training(**cfg.args)
-    hyperparameter_tuning(**cfg.tuning)
+    run_training(**cfg.args)
+    # hyperparameter_tuning(**cfg.tuning)
 
 
 if __name__ == '__main__':

@@ -206,7 +206,6 @@ def eval_ncde(model, test_dl, myloss, batch_size, device, u_normalizer=None):
 
             loss = myloss(u_pred[:, 1:, :].reshape(batch_size, -1), u_[:, 1:, :].reshape(batch_size, -1))
             test_loss += loss.item()
-    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 def train_ncde(model, train_loader, test_loader, u_normalizer, device, myloss, batch_size=20, epochs=5000, learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20, plateau_patience=None, delta=0, plateau_terminate=None, checkpoint_file='checkpoint.pt'):

@@ -85,7 +85,6 @@ def mytrain(config):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, config.epochs, verbose = False)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
     trainTime = 0
     early_stopping = EarlyStopping(patience=config.plateau_terminate,

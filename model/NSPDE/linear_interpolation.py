@@ -217,8 +217,3 @@ class LinearInterpolation(interpolation_base.InterpolationBase):
         diff_t = next_t - prev_t
         return prev_coeff + fractional_part * (next_coeff - prev_coeff) / diff_t.unsqueeze(-1)
 
-    def derivative(self, t):
-        return self.evaluate(t) 
-        # fractional_part, index = self._interpret_t(t)
-        # deriv = self._derivs[..., index, :]
-        # return deriv

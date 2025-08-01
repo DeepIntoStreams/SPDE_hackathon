@@ -24,10 +24,6 @@ def train(config):
     W, Sol = data['W'], data['sol']
     print('W shape:', W.shape)
     print('Sol shape:', Sol.shape)
-    # indices = np.random.permutation(Sol.shape[0])
-    # print('indices:', indices[:10])
-    # Sol = Sol[indices]
-    # W = W[indices]
 
     xi = torch.from_numpy(W.astype(np.float32))
     data = torch.from_numpy(Sol.astype(np.float32))

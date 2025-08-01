@@ -162,32 +162,3 @@ class NeuralSPDE(torch.nn.Module):
         
         return ys
 
-
-
-
-
-
-
-
-
-# class PolynomialFeatures(nn.Module):
-#     def __init__(self, degree):
-#         super(PolynomialFeatures, self).__init__()
-#         """Computes polynomial features up to degree (>0)"""
-#         assert degree in [1,2], 'currently only implemented for polynomial features of degree 1 and 2'
-#         self.degree = degree
-
-#     def forward(self,x):
-#       """ x: (batch, channels, 64, 64, 10)"""      
-#       if self.degree==2:
-#           monomials = torch.einsum("""aibcd, ajbcd -> aijbcd """, x, x).view(x.size(0), x.size(1)**2, x.size(2), x.size(3), x.size(4))
-#           return torch.cat([x, monomials], dim=1)
-#       return x
-
-
-# def compute_nb_new_channels(channels, order, degree):
-#     nb_derivatives = 2**(order+1)-1
-#     channels *= nb_derivatives
-#     # if degree==2:
-#     #     channels += channels**2
-#     return channels

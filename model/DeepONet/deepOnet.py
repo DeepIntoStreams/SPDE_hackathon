@@ -125,40 +125,6 @@ def dataloader_deeponet_1d_xi(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, batc
     return train_loader, test_loader, normalizer, grid
 
 
-# def dataloader_deeponet_conv_1d_xi(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, batch_size=20, dim_x=128, normalizer=False, dataset=None):
-
-#     if dataset=='phi41':
-#         T, sub_t, dim_t = 51, 1, 50
-#     elif dataset=='wave':
-#         T, sub_t = (u.shape[-1]+1)//2, 5  #TODO: dim_t
-
-#     u_train = u[:ntrain, :dim_x, 1:T:sub_t]
-#     xi_train = torch.diff(xi[:ntrain, :-1, 0:T:sub_t], dim=-1)
-#     dim_t = xi_train.shape[-1]
-
-#     u_test = u[-ntest:, :dim_x, 1:T:sub_t]
-#     xi_test = torch.diff(xi[-ntest:, :-1, 0:T:sub_t],dim=-1)
-
-#     if normalizer:
-#         xi_normalizer = UnitGaussianNormalizer(xi_train)
-#         xi_train = xi_normalizer.encode(xi_train)
-#         xi_test = xi_normalizer.encode(xi_test)
-
-#         normalizer = UnitGaussianNormalizer(u_train)
-#         u_train = normalizer.encode(u_train)
-#         u_test = normalizer.encode(u_test)
-
-#     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(xi_train, u_train), batch_size=batch_size, shuffle=True)
-#     test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(xi_test, u_test), batch_size=batch_size, shuffle=False)
-
-#     gridx = torch.tensor(np.linspace(0, 1, dim_x), dtype=torch.float)
-#     gridx = gridx.reshape(1, dim_x, 1, 1).repeat([batch_size, 1, dim_t, 1])
-#     gridt = torch.tensor(np.linspace(0, 1, dim_t), dtype=torch.float)
-#     gridt = gridt.reshape(1, 1, dim_t, 1).repeat([batch_size, dim_x, 1, 1])
-#     grid =  torch.cat((gridx, gridt), dim=-1)[0].reshape(dim_x * dim_t, 2)
-
-#     return train_loader, test_loader, normalizer, grid
-
 def dataloader_deeponet_1d_u0(u, ntrain=1000, ntest=200, T=51, sub_t=1, batch_size=20, dim_x=128, normalizer=False,
                               dataset=None):
     if dataset == 'phi41':
@@ -193,92 +159,7 @@ def dataloader_deeponet_1d_u0(u, ntrain=1000, ntest=200, T=51, sub_t=1, batch_si
     return train_loader, test_loader, normalizer, grid
 
 
-def dataloader_deeponet_2d_xi(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4, batch_size=20, normalizer=128,
-                              dataset=None, conv=False):
-    if dataset == 'sns':
-        T, sub_t, sub_x = 51, 1, 4
 
-    u_train = u[:ntrain, ::sub_x, ::sub_x, 1:T:sub_t].reshape(ntrain, -1)
-    xi_train = xi[:ntrain, ::sub_x, ::sub_x, 1:T:sub_t]
-    dim_x = xi_train.shape[1]
-    dim_t = xi_train.shape[-1]
-    if not conv:
-        xi_train = xi_train.reshape(ntrain, -1)
-
-    u_test = u[-ntest:, ::sub_x, ::sub_x, 1:T:sub_t].reshape(ntest, -1)
-    xi_test = xi[-ntest:, ::sub_x, ::sub_x, 1:T:sub_t]
-
-    if not conv:
-        xi_test = xi_test.reshape(ntest, -1)
-
-    if normalizer:
-        xi_normalizer = UnitGaussianNormalizer(xi_train)
-        xi_train = xi_normalizer.encode(xi_train)
-        xi_test = xi_normalizer.encode(xi_test)
-
-        normalizer = UnitGaussianNormalizer(u_train)
-        u_train = normalizer.encode(u_train)
-        u_test = normalizer.encode(u_test)
-
-    gridx = torch.tensor(np.linspace(0, 1, dim_x), dtype=torch.float)
-    gridx = gridx.reshape(1, dim_x, 1, 1, 1).repeat([batch_size, 1, dim_x, dim_t, 1])
-    gridy = torch.tensor(np.linspace(0, 1, dim_x), dtype=torch.float)
-    gridy = gridy.reshape(1, 1, dim_x, 1, 1).repeat([batch_size, dim_x, 1, dim_t, 1])
-    gridt = torch.tensor(np.linspace(0, 1, dim_t), dtype=torch.float)
-    gridt = gridt.reshape(1, 1, 1, dim_t, 1).repeat([batch_size, dim_x, dim_x, 1, 1])
-    grid = torch.cat((gridx, gridy, gridt), dim=-1)[0].reshape(dim_x * dim_x * dim_t, 3)
-
-    train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(xi_train, u_train), batch_size=batch_size,
-                                               shuffle=True)
-    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(xi_test, u_test), batch_size=batch_size,
-                                              shuffle=False)
-
-    return train_loader, test_loader, normalizer, grid
-
-
-def dataloader_deeponet_2d_u0(u, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4, batch_size=20, normalizer=128,
-                              dataset=None, conv=False):
-    if dataset == 'sns':
-        T, sub_t, sub_x = 51, 1, 4
-
-    u0_train = u[:ntrain, ::sub_x, ::sub_x, 0]
-
-    if not conv:
-        u0_train = u0_train.reshape(ntrain, -1)
-
-    u_train = u[:ntrain, ::sub_x, ::sub_x, 1:T:sub_t]
-    dim_t = u_train.shape[-1]
-    dim_x = u_train.shape[1]
-    u_train = u_train.reshape(ntrain, -1)
-
-    u0_test = u[-ntest:, ::sub_x, ::sub_x, 0]
-    if not conv:
-        u0_test = u0_test.reshape(ntest, -1)
-    u_test = u[-ntest:, ::sub_x, ::sub_x, 1:T:sub_t].reshape(ntest, -1)
-
-    if normalizer:
-        u0_normalizer = UnitGaussianNormalizer(u0_train)
-        u0_train = u0_normalizer.encode(u0_train)
-        u0_test = u0_normalizer.encode(u0_test)
-
-        normalizer = UnitGaussianNormalizer(u_train)
-        u_train = normalizer.encode(u_train)
-        u_test = normalizer.encode(u_test)
-
-    gridx = torch.tensor(np.linspace(0, 1, dim_x), dtype=torch.float)
-    gridx = gridx.reshape(1, dim_x, 1, 1, 1).repeat([batch_size, 1, dim_x, dim_t, 1])
-    gridy = torch.tensor(np.linspace(0, 1, dim_x), dtype=torch.float)
-    gridy = gridy.reshape(1, 1, dim_x, 1, 1).repeat([batch_size, dim_x, 1, dim_t, 1])
-    gridt = torch.tensor(np.linspace(0, 1, dim_t), dtype=torch.float)
-    gridt = gridt.reshape(1, 1, 1, dim_t, 1).repeat([batch_size, dim_x, dim_x, 1, 1])
-    grid = torch.cat((gridx, gridy, gridt), dim=-1)[0].reshape(dim_x * dim_x * dim_t, 3)
-
-    train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_train, u_train), batch_size=batch_size,
-                                               shuffle=True)
-    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(u0_test, u_test), batch_size=batch_size,
-                                              shuffle=False)
-
-    return train_loader, test_loader, normalizer, grid
 
 
 # ===========================================================================
@@ -300,7 +181,6 @@ def eval_deeponet(model, test_dl, myloss, batch_size, device, grid, u_normalizer
 
             loss = myloss(u_pred.reshape(batch_size, -1), u_.reshape(batch_size, -1))
             test_loss += loss.item()
-    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 

@@ -106,18 +106,6 @@ class FNO_space1D_time(nn.Module):
         self.fc0 = nn.Linear(T+2, self.width)
         # input channel is T+2: the solution of the first T timesteps + 2 locations (u(1, x), ..., u(T, x),  x, t)
 
-        # self.conv0 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-        # self.conv1 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-        # self.conv2 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-        # self.conv3 = SpectralConv2d(self.width, self.width, self.modes1, self.modes2)
-        # self.w0 = nn.Conv2d(self.width, self.width, 1)
-        # self.w1 = nn.Conv2d(self.width, self.width, 1)
-        # self.w2 = nn.Conv2d(self.width, self.width, 1)
-        # self.w3 = nn.Conv2d(self.width, self.width, 1)
-        # self.bn0 = torch.nn.BatchNorm2d(self.width)
-        # self.bn1 = torch.nn.BatchNorm2d(self.width)
-        # self.bn2 = torch.nn.BatchNorm2d(self.width)
-        # self.bn3 = torch.nn.BatchNorm2d(self.width)
         self.net = [ FNO_layer(modes1, modes2, width) for i in range(self.L-1) ]
         self.net += [ FNO_layer(modes1, modes2, width, last=True) ]
         self.net = nn.Sequential(*self.net)
@@ -133,25 +121,6 @@ class FNO_space1D_time(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 3, 1, 2)
         x = F.pad(x, [0,self.padding]) # pad the domain if input is non-periodic
-
-        # x1 = self.conv0(x)
-        # x2 = self.w0(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv1(x)
-        # x2 = self.w1(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv2(x)
-        # x2 = self.w2(x)
-        # x = x1 + x2
-        # x = F.gelu(x)
-
-        # x1 = self.conv3(x)
-        # x2 = self.w3(x)
-        # x = x1 + x2
 
         x = self.net(x)
 
@@ -234,7 +203,6 @@ def eval_fno_1d(model, test_dl, myloss, batch_size, device):
             u_pred = u_pred[..., 0]
             loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
             test_loss += loss.item()
-    # print('Test Loss: {:.6f}'.format(test_loss / ntest))
     return test_loss / ntest
 
 

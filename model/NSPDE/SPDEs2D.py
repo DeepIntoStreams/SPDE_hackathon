@@ -67,16 +67,6 @@ class SPDE2D():
     def partition(self, a, b, dx):  # makes a partition of [a,b] of equal sizes dx
         return np.linspace(a, b, int((b - a) / dx) + 1)
 
-    def Solve(self, W):
-        # if self.type == "E" or self.type == "Elliptic":
-        #     return self.Elliptic(W)
-        if self.type == "P" or self.type == "Parabolic":
-            return self.Parabolic(W)
-        # if self.type == "W" or self.type == "Wave":
-        #     return self.Wave(W)
-        # if self.type == "B" or self.type == "Burgers":
-        #     return self.Burgers(W)
-    
 
     # Calculat the matirx F = u_n + \mu(u_n)*dt + \sigma(\mu_n)*dW_n
     def Matrix_F(self, W, un, n, T=None, X=None, Y=None, diff=True):
