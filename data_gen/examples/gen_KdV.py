@@ -37,12 +37,12 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
         print("u0 is fixed!")
 
     # stochastic forcing
-    if noise_type == 'cyl':
+    if noise_type == 'Q':
         r = 4  # Creates r/2 spatially smooth noise
         corr = lambda x, j, a: smooth_corr(x, j, a, r + 1.001)
         W_smooth = Noise().WN_space_time_many(s, t, dt * 0.1, a, b, dx, num, J=truncation, correlation=corr)
         W_smooth = W_smooth[:, ::10, :]
-    elif noise_type == 'Q':
+    elif noise_type == 'cyl':
         W_smooth = Noise().WN_space_time_many(s, t, dt, a, b, dx, num, J=truncation)
     else:
         print('Invalid noise type!')
