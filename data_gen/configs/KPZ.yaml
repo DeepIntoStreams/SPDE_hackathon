@@ -1,0 +1,17 @@
+sim:
+  a: 0
+  b: 1.0
+  Nx: 128  # dx = (b-a)/Nx
+  s: 0
+  t: 0.05
+  Nt: 50  # dt = (t-s)/Nt
+  truncation: 256  # [32,64,128,256]
+  sigma: 1  # coefficient of additive diffusive term
+  fix_u0: True # [True,False] True--fix; False--vary
+  num: 10000
+  lam: 0.5  # coefficient of the non-linear term
+
+seed: 42
+
+save_dir: '../results/KPZ+/'
+save_name: 'KPZ+reno'
