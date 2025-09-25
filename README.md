@@ -141,6 +141,7 @@ SPDE_hackathon
 │   │       gen_phi41.py
 │   │       gen_phi42.py
 │   │       gen_wave.py
+│   │       gen_KDV.py
 │   │                 
 │   ├───notebook    # Jupyter notebooks for visualizing the generated data (.ipynb)
 │   │       
