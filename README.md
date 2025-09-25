@@ -151,6 +151,8 @@ SPDE_hackathon
     │   utilities.py
     │   
     ├───config    # All the config files for models
+    │   
+    ├───evaluation    # Evaluation and test metric for models
     │       
     ├───DeepONet
     │       deepOnet.py
