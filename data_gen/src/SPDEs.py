@@ -165,6 +165,60 @@ class SPDE():
 
         return Solution.astype('float32')
 
+
+
+    def spatial_derivative(self, u, dx):
+        dudx = np.zeros_like(u)
+        dudx[:, 1:-1] = (u[:, 2:] - u[:, :-2]) / (2 * dx)
+        dudx[:, 0] = (u[:, 1] - u[:, -1]) / (2 * dx)
+        dudx[:, -1] = (u[:, 0] - u[:, -2]) / (2 * dx)
+        return dudx
+    
+        # Solves 1D Parabolic semilinear SPDEs, given numpy array of several noises, space time domain and initial conditions
+    def Parabolic_reno(self, W, T=None, X=None, lam=0.05 , J=256, diff=True):
+        if T is None: T = self.T
+        if X is None: X = self.X
+
+        # Extract specae-time increments and dW
+        dW, dx, dt = self.initialization(W, T, X, diff)
+
+        M = self.Parabolic_Matrix(len(X) - 1, dt, dx).T  # M = (I-\Delta*dt)^{-1}
+
+        Solution = np.zeros(shape=W.shape)
+
+        # define initial conditions
+        if type(self.IC) is np.ndarray:
+            if self.IC.shape == (W.shape[0], len(X)):  # if initial conditions are given
+                IC = self.IC
+            else:
+                IC = np.array([self.IC for _ in range(W.shape[0])])  # one initial condition
+        else:
+            initial = self.vectorized(self.IC, X)  # setting initial condition for one solution
+            IC = np.array([initial for _ in range(W.shape[0])])  # for every solution
+
+        # Initialize
+        Solution[:, 0, :] = IC
+
+        # Finite difference method.
+        # u_{n+1} = u_n + (dx)^{-2} A*u_{n+1}*dt + mu(u_n)*dt + sigma(u_n)*dW_{n+1}
+        # Hence u_{n+1} = (I - dt/(dx)^2 A)^{-1} (u_n + mu(u_n)*dt + sigma(u_n)*dW_{n+1})
+        # Solve equations in paralel for every noise/IC simultaneosly
+        # for i in range(1, len(T)):
+        #     current = Solution[:, i - 1, :] + lam * (self.spatial_derivative(Solution[:, i - 1, :], dx)**2) * dt + self.sigma_(
+        #         Solution[:, i - 1, :]) * dW[:, i, :]
+        #     Solution[:, i, :] = np.dot(current.reshape((W.shape[0], len(X))), M)
+
+        for i in range(1, len(T)):
+            current = Solution[:, i - 1, :] + lam * (self.spatial_derivative(Solution[:, i - 1, :], dx)**2 - J) * dt + self.sigma_(
+                Solution[:, i - 1, :]) * dW[:, i, :]
+            Solution[:, i, :] = np.dot(current.reshape((W.shape[0], len(X))), M)
+
+        # Because Solution.iloc[i-1] and thus current is a vector of length len(noises)*len(X)
+        # need to reshape it to matrix of the shape (W.shape[0], len(X)) and multiply on the right by the M^T (transpose).
+        # M*(current.reshape(...)) does not give the correct value.
+
+        return Solution.astype('float32')
+
     # Solves 1D stochasrtic Wave equation, given numpy array of several noises and space time domain
     def Wave(self, W, T=None, X=None, diff=True):
         if T is None: T = self.T
