@@ -1,8 +1,5 @@
 # SPDEBench: An Extensive Benchmark for Learning Regular and Singular Stochastic PDEs
 
-This repository is the official implementation
-of [SPDEBench: An Extensive Benchmark for Learning Regular and Singular Stochastic PDEs](https://github.com/DeepIntoStreams/SPDE_hackathon).
-
 SPDEBench is designed to solve typical SPDEs of physical significance (i.e.
 the $\Phi^4_d$, wave, incompressible Navier-Stokes, and KdV equations) on 1D or 2D tori driven by white noise via ML
 methods. New datasets for singular SPDEs based on the renormalization process have been constructed, and novel ML models
