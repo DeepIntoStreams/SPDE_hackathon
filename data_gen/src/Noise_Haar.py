@@ -1,13 +1,12 @@
-import math
+# Partially adapted from https://github.com/RazliTamir/HaarApproximation
 
+
+import math
 import numpy as np
 import pandas as pd
-"""implementation of haar's estimation"""
 from typing import Iterator, TypeAlias
 from random import choice
-
-import matplotlib.pyplot as plt  # type: ignore # missing stubs
-
+import matplotlib.pyplot as plt
 from numpy.typing import NDArray
 import sympy as sp
 
@@ -177,10 +176,15 @@ class Noise():
         max_depth = max(J_depth, Nx_depth)
         W = []
         for time_step in range(num_time_steps):
-            amps = {
-                (depth, index): 0 if depth==0 or depth >= J_depth else (2**((depth-1)/2)) * B[time_step, 2**(depth-1) + index]
-                for depth, index in iter_depth(max_depth)
-            }
+            amps = {}
+            for depth, index in iter_depth(max_depth):
+                if depth > J_depth:
+                    val = 0.0
+                elif depth == 0:
+                    val = B[time_step, 0]
+                else:
+                    val = (2 ** ((depth - 1) / 2)) * B[time_step, 2 ** (depth - 1) + index]
+                amps[(depth, index)] = val
             haar_1d = Haar.from_amplitudes(amps, max_depth)
             W.append(haar_1d.array)  # its shape is (2**max_depth, )
         W = np.pad(
