@@ -11,6 +11,7 @@ import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..", ".."))
 from data_gen.src.Noise import Noise
+# from data_gen.src.Noise_Haar import Noise
 from data_gen.src.SPDEs import SPDE
 
 
