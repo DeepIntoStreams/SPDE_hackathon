@@ -1,7 +1,6 @@
-from model.src.evaluations.augmentations import apply_augmentations, parse_augmentations, Basepoint, Scale
+from model.evaluations.augmentations import apply_augmentations, parse_augmentations, Basepoint, Scale
 from functools import partial
 from typing import Tuple, Optional
-from model.src.utils import to_numpy
 import math
 # from .trainers.sig_wgan import SigW1Metric
 
@@ -15,8 +14,7 @@ from scipy import linalg
 from sklearn.metrics.pairwise import polynomial_kernel
 # import signatory
 # import ksig
-from model.src.utils import AddTime, set_seed
-from model.src.evaluations.metrics import *
+from model.evaluations.metrics import *
 
 
 

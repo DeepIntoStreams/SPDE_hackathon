@@ -6,10 +6,10 @@ from scipy import linalg
 from sklearn.metrics.pairwise import polynomial_kernel
 # import signatory
 # import ksig
-from model.src.utils import AddTime
-from model.src.evaluations.metrics import *
-from model.src.evaluations.eval_helper import *
-from model.src.evaluations.test_metrics import * #TODO: remove as all metrics will be included in metrics.py
+from model.evaluations.augmentations import AddTime
+from model.evaluations.metrics import *
+from model.evaluations.eval_helper import *
+from model.evaluations.test_metrics import * #TODO: remove as all metrics will be included in metrics.py
 
 
 def acf_diff(x): return torch.sqrt(torch.pow(x, 2).sum(0))

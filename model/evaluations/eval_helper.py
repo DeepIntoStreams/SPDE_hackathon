@@ -1,9 +1,8 @@
 import torch
 from torch import nn
 import numpy as np
-from model.src.utils import to_numpy
 from typing import Tuple
-from model.src.evaluations.augmentations import apply_augmentations, parse_augmentations, Basepoint, Scale
+from model.evaluations.augmentations import apply_augmentations, parse_augmentations, Basepoint, Scale
 import math
 from torch.utils.data import DataLoader, TensorDataset
 import copy
@@ -13,7 +12,7 @@ from dataclasses import dataclass
 def cov_torch(x):
     """Estimates covariance matrix like numpy.cov"""
     device = x.device
-    x = to_numpy(x)
+    x = x.detach().cpu().numpy()
     _, L, C = x.shape
     x = x.reshape(-1, L*C)
     return torch.from_numpy(np.cov(x, rowvar=False)).to(device).float()
@@ -61,7 +60,7 @@ def non_stationary_acf_torch(X, symmetric=False):
         if hasattr(torch,'corrcoef'): # version >= torch2.0
             correlations[:, :, i] = torch.corrcoef(X[:, :, i].t())
         else: #TODO: test and fix
-            correlations[:, :, i] = torch.from_numpy(np.corrcoef(to_numpy(X[:, :, i]).T))
+            correlations[:, :, i] = torch.from_numpy(np.corrcoef(X[:, :, i].detach().cpu().numpy().T))
 
     if not symmetric:
         # Loop through each time step from lag to T-1
