@@ -5,8 +5,12 @@ from matplotlib.ticker import MaxNLocator
 import numpy as np
 import seaborn as sns
 from sklearn.manifold import TSNE
-from src.evaluations.eval_helper import acf_torch, non_stationary_acf_torch
-from src.utils import loader_to_tensor, to_numpy
+from evaluations.statistics import acf_torch, non_stationary_acf_torch, to_numpy
+
+
+def _loader_to_tensor(dl):
+    """Convert a DataLoader to a single concatenated tensor."""
+    return torch.cat([batch[0] for batch in dl])
 
 
 def plot_summary(fake_dl, real_dl, config, max_lag=None):
@@ -19,7 +23,7 @@ def plot_summary(fake_dl, real_dl, config, max_lag=None):
     config: configuration file
     max_lag: int, maximum length of the path to be plotted
     """
-    x_real, x_fake = loader_to_tensor(real_dl), loader_to_tensor(fake_dl)
+    x_real, x_fake = _loader_to_tensor(real_dl), _loader_to_tensor(fake_dl)
     if max_lag is None:
         max_lag = min(128, x_fake.shape[1])
 
@@ -82,10 +86,8 @@ def compare_acf(x_real, x_fake, ax=None, max_lag=64, CI=True, dim=(0, 1), drop_f
     if ax is None:
         _, ax = plt.subplots(1, 1)
     acf_real = acf_torch(x_real, max_lag=max_lag, dim=dim).cpu().numpy()
-    # acf_real = np.mean(acf_real_list, axis=0)
 
     acf_fake = acf_torch(x_fake, max_lag=max_lag, dim=dim).cpu().numpy()
-    # acf_fake = np.mean(acf_fake_list, axis=0)
 
     ax.plot(acf_real[drop_first_n_lags:], label='Historical')
     ax.plot(acf_fake[drop_first_n_lags:], label='Generated', alpha=0.8)
@@ -157,7 +159,7 @@ def plot_samples(real_dl, fake_dl, config, plot_show=False):
     The plots will be saved in the experiment directory
     """
     sns.set()
-    real_X, fake_X = loader_to_tensor(real_dl), loader_to_tensor(fake_dl)
+    real_X, fake_X = _loader_to_tensor(real_dl), _loader_to_tensor(fake_dl)
     x_real_dim = real_X.shape[-1]
 
     for i in range(x_real_dim):
@@ -210,8 +212,6 @@ def plot_non_stationary_autocorrelation(x1, x2, config, ignore_diagonal=False, p
             np.fill_diagonal(heatmap1, 0)
             np.fill_diagonal(heatmap2, 0)
 
-        # Add padding to the extent of the heatmaps to create space between the cells
-
         # Plot the first heat map in the left column
         im1 = axs[d, 0].imshow(heatmap1, cmap='Blues')
         axs[d, 0].set_title(f'Historical Dimension {d}')
@@ -240,7 +240,7 @@ def plot_non_stationary_autocorrelation(x1, x2, config, ignore_diagonal=False, p
 def compare_acf_matrix(real_dl, fake_dl, config):
     """ Computes ACF of historical and (mean)-ACF of generated and plots those. """
 
-    x_real, x_fake = loader_to_tensor(real_dl), loader_to_tensor(fake_dl)
+    x_real, x_fake = _loader_to_tensor(real_dl), _loader_to_tensor(fake_dl)
 
     acf_real = non_stationary_acf_torch(x_real, symmetric=True).cpu().numpy()
 
@@ -250,7 +250,7 @@ def compare_acf_matrix(real_dl, fake_dl, config):
 
 
 def tsne_plot(real_dl, fake_dl, config, plot_show=False):
-    real_X, fake_X = loader_to_tensor(real_dl), loader_to_tensor(fake_dl)
+    real_X, fake_X = _loader_to_tensor(real_dl), _loader_to_tensor(fake_dl)
     # Analysis sample size (for faster computation)
     anal_sample_no = min([1000, len(real_X)])
     idx = np.random.permutation(len(real_X))[:anal_sample_no]
