@@ -7,7 +7,7 @@ sim:
   Nt: 50  # dt = (t-s)/Nt = 1e-2
   noise_type: Q  # ${noise_type}  # either 'cyl' or 'Q'
   truncation: 128  # sim.truncation=32,64,128,256
-  sigma: 0.5  # coefficient of additive diffusive term
+  sigma: 0.1  # coefficient of additive diffusive term
   fix_u0: True  # True -> fix; False -> vary
   num: 1200
 
