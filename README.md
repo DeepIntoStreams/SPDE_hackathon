@@ -215,6 +215,7 @@ This project incorporates code from the following open-source repositories:
 - [DEQ](https://github.com/locuslab/deq.git). Licensed under the MIT license.
 - [Neural-SPDEs](https://github.com/crispitagorico/torchspde). Licensed under the Apache-2.0 license.
 - [DLR-Net](https://github.com/sdogsq/DLR-Net).
+- [Evaluation of Time Series Generative Models](https://github.com/DeepIntoStreams/Evaluation-of-Time-Series-Generative-Models/tree/main)
 - [HaarApproximation](https://github.com/RazliTamir/HaarApproximation).
 
 Many thanks to their authors for sharing these valuable contributions!

@@ -73,7 +73,7 @@ def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=
         Extra_nonlinearity = 0
         if Burgers != 0 or KPZ != 0:  # if Burgers or KPZ is present compute space derivative. M/X = (dx)^{-1}
             diff = np.zeros((soln.shape[0], M))
-            diff[:, 1:] = np.diff(soln[:, i - 1, :], axis=1)
+            diff[:, 1:] = np.diff(soln[:, i - 1, :], axis=1) * M / X
             diff[:, 0] = (soln[:, i - 1, 0] - soln[:, i - 1, -1]) * M / X
         if Burgers != 0:  # add Burgers nonlnearity u*(\partial_x u)
             Extra_nonlinearity += Burgers * soln[:, i - 1, :] * diff

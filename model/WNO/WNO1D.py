@@ -8,7 +8,7 @@ from model.utilities import *
 
 
 class WaveConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, level, dummy_input):
+    def __init__(self, in_channels, out_channels, level, dummy_input, wavelet='db6'):
         super(WaveConv2d, self).__init__()
         """
         2D Wavelet Layer. 
@@ -17,9 +17,10 @@ class WaveConv2d(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.level = level
+        self.wavelet = wavelet
 
-        self.dwt = DWTForward(J=self.level, mode='symmetric', wave='db6').to(dummy_input.device)
-        self.idwt = DWTInverse(mode='symmetric', wave='db6').to(dummy_input.device)
+        self.dwt = DWTForward(J=self.level, mode='symmetric', wave=self.wavelet).to(dummy_input.device)
+        self.idwt = DWTInverse(mode='symmetric', wave=self.wavelet).to(dummy_input.device)
 
         # Get coefficient shapes via a dummy run for shape-adaptive weights
         yl, yh = self.dwt(dummy_input)
@@ -54,12 +55,12 @@ class WaveConv2d(nn.Module):
 
 
 class WNO_layer(nn.Module):
-    def __init__(self, width, level, dummy_input, last=False):
+    def __init__(self, width, level, dummy_input, wavelet='db6', last=False):
         super(WNO_layer, self).__init__()
         self.last = last
 
         # dummy_input is passed to initialize the shape of WaveConv2d weights
-        self.conv = WaveConv2d(width, width, level, dummy_input)
+        self.conv = WaveConv2d(width, width, level, dummy_input, wavelet=wavelet)
         self.w = nn.Conv2d(width, width, 1)
 
     def forward(self, x):
@@ -74,7 +75,7 @@ class WNO_layer(nn.Module):
 
 
 class WNO_space1D_time(nn.Module):
-    def __init__(self, level, width, L, T, input_sample):
+    def __init__(self, level, width, L, T, input_sample, wavelet='db6'):
         super(WNO_space1D_time, self).__init__()
 
         """
@@ -83,6 +84,7 @@ class WNO_space1D_time(nn.Module):
         self.level = level
         self.width = width
         self.L = L
+        self.wavelet = wavelet
         self.padding = 6
 
         # Input channel dimension is T_in + 2 (T_in + spatial grid + temporal grid)
@@ -94,9 +96,9 @@ class WNO_space1D_time(nn.Module):
             input_sample.device)
 
         layers = []
-        for i in range(self.L - 1):
-            layers.append(WNO_layer(width, level, dummy_tensor))
-        layers.append(WNO_layer(width, level, dummy_tensor, last=True))
+        for _ in range(self.L - 1):
+            layers.append(WNO_layer(width, level, dummy_tensor, wavelet=self.wavelet))
+        layers.append(WNO_layer(width, level, dummy_tensor, wavelet=self.wavelet, last=True))
 
         self.net = nn.Sequential(*layers)
 

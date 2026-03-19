@@ -2,7 +2,7 @@
 # Modified for current implementation by the authors of SPDEBench
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import scipy.io
 import numpy as np
 import os
@@ -48,11 +48,20 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
         print('Invalid noise type!')
         exit(0)
 
-    L_kdv = [0, 0, 1e-3, -0.1, 0]
+    L_kdv = [0, 0, 0, -0.1, 0]
     mu_kdv = lambda x: 0
     sigma_kdv = lambda x: sigma
 
-    KdV, _, _ = general_1d_solver(L_kdv, u0, W_smooth[:, :, :-1], mu=mu_kdv, sigma=sigma_kdv, Burgers=-6)
+    KdV, _, _ = general_1d_solver(
+        L_kdv,
+        u0,
+        W_smooth[:, :, :-1],
+        mu=mu_kdv,
+        sigma=sigma_kdv,
+        T=t - s,
+        X=b - a,
+        Burgers=6,
+    )
 
     W = W_smooth.transpose(0,2,1)
     soln = KdV.transpose(0,2,1)
@@ -60,6 +69,7 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
 
 @hydra.main(version_base=None, config_path="../configs/", config_name="KdV")
 def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg, resolve=True))
     np.random.seed(cfg.seed)
 
     O_X, O_T, W, soln = simulator(**cfg.sim)
