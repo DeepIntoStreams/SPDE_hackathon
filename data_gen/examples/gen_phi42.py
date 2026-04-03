@@ -7,10 +7,11 @@ import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..", ".."))
-from data_gen.src.Noise2D import Noise2D
+from data_gen.src.NoiseND import NoiseND
 from data_gen.src.SPDEs2D import SPDE2D
 
 def solver(a, b, Nx, c, d, Ny, s, t, Nt, num, eps, sigma, fix_u0):
+    noise = NoiseND()
 
     dx, dy, dt = (b-a)/Nx, (d-c)/Ny, (t - s) / Nt  # space-time increments
 
@@ -19,13 +20,21 @@ def solver(a, b, Nx, c, d, Ny, s, t, Nt, num, eps, sigma, fix_u0):
     mu = lambda x: 3*x-x**3 # drift
     # sigma_fun = lambda x: sigma # additive diffusive term
 
-    O_X, O_Y = Noise2D().partition_2d(a,b,dx,c,d,dy) # space grid O_X, O_Y
-    O_T = Noise2D().partition(s,t,dt) # time grid O_T
-    W = Noise2D().WN_space_time_2d_many(s, t, dt, a, b, dx, c, d, dy, num, eps, eps) # create realizations of space-time white noise
+    O_X, O_Y = noise.partition_nd(((a, b), (c, d)), (dx, dy))
+    O_T = noise.partition_axis(s, t, dt)
+    W = noise.WN_space_time_many(
+        s,
+        t,
+        dt,
+        bounds=((a, b), (c, d)),
+        steps=(dx, dy),
+        num=num,
+        truncation=(eps, eps),
+    )
 
     if not fix_u0: # varying initial condition
         grid_X, grid_Y = np.meshgrid(O_X, O_Y)
-        ic_ = 0.1*Noise2D().initial(num, O_X, O_Y, scaling = 1) # one cycle
+        ic_ = 0.1 * noise.initial(num, (O_X, O_Y), scaling=1)
         ic = 0.1*(ic_-ic_[:,0,None,0,None]) + ic(grid_X, grid_Y)
         print("u0 is varying!")
     else:
@@ -54,5 +63,4 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
-
 

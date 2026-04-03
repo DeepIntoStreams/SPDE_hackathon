@@ -10,25 +10,35 @@ import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..", ".."))
-from data_gen.src.Noise import Noise
+from data_gen.src.NoiseND import NoiseND
 from data_gen.src.SPDEs import SPDE
 
 def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num, lam):
+    noise = NoiseND()
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
-    O_X, O_T = Noise().partition(a,b,dx), Noise().partition(s,t,dt) # space grid O_X and time grid O_T
+    O_X = noise.partition_axis(a, b, dx)
+    O_T = noise.partition_axis(s, t, dt)
 
     mu = lambda x: 3*x-x**3 # drift
 
     ic = lambda x: x*(1-x) # initial condition (fixed part)
     if not fix_u0: # varying initial condition
         X_ = np.linspace(-0.5,0.5,Nx+1)
-        ic_ = Noise().initial(num, X_, scaling = 1) # one cycle
+        ic_ = noise.initial(num, (X_,), scaling=1)[:, :]
         ic = 0.1*(ic_ - ic_[:,0,None]) + ic(O_X)
         print("u0 is varying!")
     else:
         print("u0 is fixed!")
 
-    W = Noise().WN_space_time_many(s, t, dt, a, b, dx, num, J=truncation) # create realizations of space-time white noise
+    W = noise.WN_space_time_many(
+        s,
+        t,
+        dt,
+        bounds=((a, b),),
+        steps=(dx,),
+        num=num,
+        truncation=(truncation + 1,),
+    )
     Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic_reno(W, O_T, O_X, lam, truncation) # solve parabolic equation
 
     W = W.transpose(0,2,1)
