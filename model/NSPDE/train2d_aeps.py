@@ -14,7 +14,6 @@ import os.path as osp
 import sys
 from model.NSPDE.neural_aeps_spde import *
 from model.NSPDE.utilities_aeps import *
-from model.NSPDE.Noise import Noise2D
 from model.NSPDE.SPDEs2D import SPDE2D
 import warnings
 warnings.filterwarnings('ignore')

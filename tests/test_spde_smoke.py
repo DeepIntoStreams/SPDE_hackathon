@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import scipy.io
+import torch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -13,6 +14,8 @@ from data_gen.examples.gen_KdV_refine import simulator as kdv_refine_simulator
 from data_gen.examples.gen_navier_stokes import simulator as ns_simulator
 from data_gen.examples.gen_phi41 import simulator as phi41_simulator
 from data_gen.examples.gen_phi42 import solver as phi42_simulator
+from data_gen.examples.gen_phi43 import build_save_dict as phi43_build_save_dict
+from data_gen.examples.gen_phi43 import simulator as phi43_simulator
 from data_gen.examples.gen_wave import simulator as wave_simulator
 
 
@@ -53,6 +56,50 @@ def test_phi42_smoke():
     assert w.shape == (1, 3, 3, 3)
     assert sol_reno.shape == (1, 3, 3, 3)
     assert sol_expl.shape == (1, 3, 3, 3)
+
+
+def test_phi43_smoke(tmp_path):
+    np.random.seed(0)
+    torch.manual_seed(0)
+
+    x, y, z, t, w, sol, spde, pre = phi43_simulator(
+        N=1,
+        dt=0.01,
+        steps=2,
+        num=1,
+        fix_u0=True,
+        num_tau=8,
+        tau_max_multiplier=4.0,
+        include_c12=True,
+        seed=0,
+    )
+
+    assert x.shape == (3,)
+    assert y.shape == (3,)
+    assert z.shape == (3,)
+    assert t.shape == (3,)
+    assert w.shape == (1, 3, 3, 3, 3)
+    assert sol.shape == (1, 3, 3, 3, 3)
+
+    save_path = tmp_path / "phi43_smoke.mat"
+    scipy.io.savemat(
+        save_path,
+        phi43_build_save_dict(
+            x=x,
+            y=y,
+            z=z,
+            t=t,
+            w=w,
+            sol=sol,
+            spde=spde,
+            pre=pre,
+            save_single_path_tcxyz=True,
+        ),
+    )
+
+    data = scipy.io.loadmat(save_path)
+    assert data["W_single_tcxyz"].shape == (3, 1, 3, 3, 3)
+    assert data["sol_single_tcxyz"].shape == (3, 1, 3, 3, 3)
 
 
 def test_kpz_smoke():

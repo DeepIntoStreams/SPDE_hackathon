@@ -57,6 +57,12 @@ class SPDE3D:
     def eps(self):
         return 2.0 / float(self.M)
 
+    def spatial_grid(self):
+        return np.linspace(-1.0, 1.0, self.M, endpoint=False, dtype=self._float_dtype())
+
+    def time_grid(self):
+        return np.linspace(0.0, self.steps * self.dt, self.steps + 1, dtype=self._float_dtype())
+
     def vectorized_3d(self, f, vec1, vec2, vec3):
         v1, v2, v3 = np.meshgrid(vec1, vec2, vec3, indexing="ij")
         if f is None:
@@ -249,11 +255,63 @@ class SPDE3D:
         if isinstance(self.IC, (np.ndarray, torch.Tensor)):
             return self._coerce_field(self.IC)
 
-        grid = np.linspace(-1.0, 1.0, self.M, endpoint=False, dtype=self._float_dtype())
+        grid = self.spatial_grid()
         ic = self.vectorized_3d(self.IC, grid, grid, grid)
         if np.isscalar(ic):
             ic = np.full((self.M, self.M, self.M), ic, dtype=self._float_dtype())
         return self._coerce_field(ic)
+
+    def sample_noise_path(self, generator=None):
+        if generator is None:
+            generator = torch.Generator(device=self.device)
+            generator.manual_seed(self.seed)
+
+        noise = torch.empty(
+            (self.steps, self.M, self.M, self.M),
+            dtype=self._torch_dtype(),
+            device=self.device,
+        )
+        for step in range(self.steps):
+            noise[step] = self._noise_real_space(generator=generator)
+        return noise
+
+    def rollout(
+        self,
+        phi0: Optional[torch.Tensor] = None,
+        pre=None,
+        generator=None,
+        noise=None,
+        include_initial=True,
+    ):
+        pre = self._ensure_precomp(pre)
+        if phi0 is None and self.IC is not None:
+            phi = self.initial_condition()
+        else:
+            phi = self._coerce_field(phi0)
+
+        if noise is None:
+            noise = self.sample_noise_path(generator=generator)
+        else:
+            noise = torch.as_tensor(noise, dtype=self._torch_dtype(), device=self.device)
+            if tuple(noise.shape) != (self.steps, self.M, self.M, self.M):
+                raise ValueError(
+                    f"noise must have shape {(self.steps, self.M, self.M, self.M)}, got {tuple(noise.shape)}."
+                )
+
+        traj = []
+        if include_initial:
+            traj.append(phi.clone())
+
+        for step in range(self.steps):
+            phi = self._semi_implicit_step_from_noise(phi, noise[step], pre=pre)
+            traj.append(phi.clone())
+
+        if traj:
+            trajectory = torch.stack(traj, dim=0)
+        else:
+            shape = (0, self.M, self.M, self.M)
+            trajectory = torch.empty(shape, dtype=self._torch_dtype(), device=self.device)
+        return phi, trajectory, noise
 
     def _semi_implicit_step_from_noise(self, phi, noise, pre=None):
         pre = self._ensure_precomp(pre)
@@ -278,40 +336,19 @@ class SPDE3D:
         generator=None,
         noise=None,
     ):
-        pre = self._ensure_precomp(pre)
-        if phi0 is None and self.IC is not None:
-            phi = self.initial_condition()
-        else:
-            phi = self._coerce_field(phi0)
-
         if generator is None and noise is None:
             generator = torch.Generator(device=self.device)
             generator.manual_seed(self.seed)
 
-        if noise is not None:
-            noise = torch.as_tensor(noise, dtype=self._torch_dtype(), device=self.device)
-            if tuple(noise.shape) != (self.steps, self.M, self.M, self.M):
-                raise ValueError(
-                    f"noise must have shape {(self.steps, self.M, self.M, self.M)}, got {tuple(noise.shape)}."
-                )
-
-        traj = []
-        for step in range(self.steps):
-            if noise is None:
-                phi = self.semi_implicit_step(phi, generator=generator, pre=pre)
-            else:
-                phi = self._semi_implicit_step_from_noise(phi, noise[step], pre=pre)
-            traj.append(phi.clone())
-
-        phi_final = phi
+        phi_final, traj_tensor, _ = self.rollout(
+            phi0=phi0,
+            pre=pre,
+            generator=generator,
+            noise=noise,
+            include_initial=False,
+        )
         snapshots = None
         if snapshot_every > 0:
-            if traj:
-                traj_tensor = torch.stack(traj, dim=0)
-            else:
-                traj_tensor = torch.empty(
-                    (0, self.M, self.M, self.M), dtype=self._torch_dtype(), device=self.device
-                )
             start = max(int(burnin), 0)
             traj_post = traj_tensor[start:]
             if traj_post.shape[0] == 0:
