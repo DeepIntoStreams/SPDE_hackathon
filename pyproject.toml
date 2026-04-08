@@ -1,0 +1,42 @@
+[project]
+name = "spde-hackathon"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "torch>=2.5",
+    "numpy",
+    "scipy",
+    "hydra-core",
+    "omegaconf",
+    "torchcde==0.2.5",
+    "scikit-learn",
+    "tqdm",
+    "pandas",
+    "matplotlib",
+    "h5py",
+    "termcolor",
+    "pytorch-wavelets",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

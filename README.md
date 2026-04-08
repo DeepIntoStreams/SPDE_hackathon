@@ -191,7 +191,6 @@ SPDE_hackathon
             linear_interpolation.py
             neural_aeps_spde.py
             neural_spde.py
-            Noise.py
             root_find_solver.py
             root_finding_algorithms.py
             SPDEs2D.py

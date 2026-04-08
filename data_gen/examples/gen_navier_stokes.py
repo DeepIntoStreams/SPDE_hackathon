@@ -18,15 +18,14 @@ from data_gen.src.generator_sns import navier_stokes_2d
 from data_gen.src.random_forcing import GaussianRF
 from timeit import default_timer
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def simulator(cfg):
 
     # Set up 2d GRF with covariance parameters
-    GRF = GaussianRF(2, cfg.s, alpha=cfg.alpha, tau=cfg.tau, device=device)
+    GRF = GaussianRF(2, cfg.s, alpha=cfg.alpha, tau=cfg.tau)
 
     # Forcing function: 0.1*(sin(2pi(x+y)) + cos(2pi(x+y)))
-    t = torch.linspace(0, 1, cfg.s + 1, device=device)
+    t = torch.linspace(0, 1, cfg.s + 1)
     t = t[0:-1]
     X, Y = torch.meshgrid(t, t)
     f = 0.1 * (torch.sin(2 * math.pi * (X + Y)) + torch.cos(2 * math.pi * (X + Y)))
