@@ -8,7 +8,7 @@ ML-based models, including FNO, NSPDE and DLR-Net, etc.
 
 Below, we provide instructions on how to use code in this repository to generate datasets and train models as in our paper.
 
-![Phi42](https://github.com/DeepIntoStreams/SPDE_hackathon/blob/main/Phi42_xi_eps_128_sigma_1_249.png)
+![Phi42](assets/Phi42_xi_eps_128_sigma_1_249.png)
 
 ---
 
