@@ -12,7 +12,9 @@ import sys
 import os
 from scipy.optimize import root
 import time
-from termcolor import colored
+ANSI_RED = "\033[31m"
+ANSI_BLUE = "\033[34m"
+ANSI_RESET = "\033[0m"
 
 def forward_iteration(f, x0, threshold=50, eps=1e-2):
     f0 = f(x0)
@@ -287,27 +289,27 @@ def analyze_broyden(res_info, err=None, judge=True, name='forward', training=Tru
         return nstep >= threshold or (nstep == 0 and (diff != diff or diff > eps)) or prot_break or torch.isnan(res_est).any()
     
     assert (err is not None), "Must provide err information when not in judgment mode"
-    prefix, color = ('', 'red') if name == 'forward' else ('back_', 'blue')
+    prefix, color_code = ('', ANSI_RED) if name == 'forward' else ('back_', ANSI_BLUE)
     eval_prefix = '' if training else 'eval_'
     
     # Case 1: A nan entry is produced in Broyden
     if torch.isnan(res_est).any():
-        msg = colored(f"WARNING: nan found in Broyden's {name} result. Diff: {diff}", color)
-        print(msg)
+        msg = f"WARNING: nan found in Broyden's {name} result. Diff: {diff}"
+        print(f"{color_code}{msg}{ANSI_RESET}")
         if save_err: pickle.dump(err, open(f'{prefix}{eval_prefix}nan.pkl', 'wb'))
         return (1, msg, res_info)
         
     # Case 2: Unknown problem with Broyden's method (probably due to nan update(s) to the weights)
     if nstep == 0 and (diff != diff or diff > eps):
-        msg = colored(f"WARNING: Bad Broyden's method {name}. Why?? Diff: {diff}. STOP.", color)
-        print(msg)
+        msg = f"WARNING: Bad Broyden's method {name}. Why?? Diff: {diff}. STOP."
+        print(f"{color_code}{msg}{ANSI_RESET}")
         if save_err: pickle.dump(err, open(f'{prefix}{eval_prefix}badbroyden.pkl', 'wb'))
         return (2, msg, res_info)
         
     # Case 3: Protective break during Broyden (so that it does not diverge to infinity)
     if prot_break and np.random.uniform(0,1) < 0.05:
-        msg = colored(f"WARNING: Hit Protective Break in {name}. Diff: {diff}. Total Iter: {len(trace)}", color)
-        print(msg)
+        msg = f"WARNING: Hit Protective Break in {name}. Diff: {diff}. Total Iter: {len(trace)}"
+        print(f"{color_code}{msg}{ANSI_RESET}")
         if save_err: pickle.dump(err, open(f'{prefix}{eval_prefix}prot_break.pkl', 'wb'))
         return (3, msg, res_info)
         
