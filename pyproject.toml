@@ -16,7 +16,6 @@ dependencies = [
     "pandas",
     "matplotlib",
     "h5py",
-    "termcolor",
     "pytorch-wavelets",
 ]
 
