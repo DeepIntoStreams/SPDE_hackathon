@@ -2,7 +2,6 @@ import scipy.io
 import random
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import signatory
 import os
 import os.path as osp
 import sys
