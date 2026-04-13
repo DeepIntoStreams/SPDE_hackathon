@@ -11,6 +11,7 @@ dependencies = [
     "hydra-core",
     "omegaconf",
     "torchcde==0.2.5",
+    "iisignature",
     "scikit-learn",
     "tqdm",
     "pandas",
@@ -24,13 +25,16 @@ dev = [
     "pytest",
 ]
 
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
 [[tool.uv.index]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[tool.uv.sources]
-torch = { index = "pytorch" }
+[tool.uv.extra-build-dependencies]
+iisignature = ["numpy"]
 
 [tool.ruff]
 line-length = 100
