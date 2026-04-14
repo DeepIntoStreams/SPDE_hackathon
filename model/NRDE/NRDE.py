@@ -6,7 +6,27 @@ import csv
 import itertools
 import numpy as np
 import torchcde
+import iisignature
 from model.utilities import *
+
+
+def logsig_windows_iisig(x, depth, window_length):
+    batch_size, length, channels = x.shape
+    spec = iisignature.prepare(channels, depth)
+    logsig_channels = iisignature.logsiglength(channels, depth)
+    out = []
+
+    x_np = x.detach().cpu().numpy()
+    for i in range(batch_size):
+        rows = [np.pad(x_np[i, 0], (0, logsig_channels - channels))]
+        for start in range(0, length - 1, window_length):
+            end = min(start + window_length, length - 1)
+            window = np.ascontiguousarray(x_np[i, start : end + 1])
+            rows.append(iisignature.logsig(window, spec))
+        rows = np.stack(rows, axis=0)
+        out.append(np.cumsum(rows, axis=0))
+
+    return torch.as_tensor(np.stack(out, axis=0), dtype=x.dtype, device=x.device)
 
 ######################
 # A CDE model looks like
@@ -129,8 +149,8 @@ def dataloader_nrde_1d(u, xi, ntrain=1000, ntest=200, T=51, sub_t=1, batch_size=
     ######################################################################################
 
     #### this is what differs from NCDE ##################################################
-    xi_train = torchcde.logsig_windows(xi_train, depth, window_length=window_length)
-    xi_test = torchcde.logsig_windows(xi_test, depth, window_length=window_length)
+    xi_train = logsig_windows_iisig(xi_train, depth, window_length=window_length)
+    xi_test = logsig_windows_iisig(xi_test, depth, window_length=window_length)
     ######################################################################################
 
     if normalizer:
@@ -266,4 +286,3 @@ def train_nrde_1d(model, train_loader, test_loader, u_normalizer, device, myloss
     except KeyboardInterrupt:
 
         return model, losses_train, losses_test
-
