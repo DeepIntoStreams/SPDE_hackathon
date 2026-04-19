@@ -58,7 +58,7 @@ def _paper_renorm_geometry(N, eps):
     return main_mask, alias_lam
 
 
-def _compute_reference_constants(N, dt, num_tau, tau_max_multiplier, include_c12):
+def _compute_reference_cmass(N, num_tau, tau_max_multiplier):
     M = 2 * N + 1
     eps = 2.0 / float(M)
     centered_modes = _centered_mode_numbers(N)
@@ -74,8 +74,7 @@ def _compute_reference_constants(N, dt, num_tau, tau_max_multiplier, include_c12
 
     main_mask, alias_lam_full = _paper_renorm_geometry(N, eps)
     main_slice = slice(N, 3 * N + 1)
-    integrand11 = np.empty((taus.shape[0],), dtype=np.float64)
-    integrand12 = np.empty((taus.shape[0],), dtype=np.float64)
+    integrand = np.empty((taus.shape[0],), dtype=np.float64)
 
     for i, tau in enumerate(taus):
         P_box = np.exp(-tau * lam_box)
@@ -85,30 +84,15 @@ def _compute_reference_constants(N, dt, num_tau, tau_max_multiplier, include_c12
 
         conv_VV = _linear_convolution_3d(V_box, V_box)
 
-        P_main_full = np.zeros_like(conv_VV)
-        P_main_full[main_slice, main_slice, main_slice] = P_box
-        integrand11[i] = float(np.sum(P_main_full * conv_VV))
+        P_full = np.where(main_mask, 0.0, np.exp(-tau * alias_lam_full))
+        P_full[main_slice, main_slice, main_slice] = P_box
+        integrand[i] = float(np.sum(P_full * conv_VV))
 
-        if include_c12:
-            P_alias_full = np.where(main_mask, 0.0, np.exp(-tau * alias_lam_full))
-            integrand12[i] = float(np.sum(P_alias_full * conv_VV))
-        else:
-            integrand12[i] = 0.0
-
-    c11 = float((2.0 ** -5) * np.trapezoid(integrand11, taus))
-    c12 = float((2.0 ** -5) * np.trapezoid(integrand12, taus))
-    c1 = c11 + c12
-    cmass = 3.0 * c0 - 9.0 * c1
-    return {
-        "C0": c0,
-        "C11": c11,
-        "C12": c12,
-        "C1": c1,
-        "Cmass": cmass,
-    }
+    c1 = float((2.0 ** -5) * np.trapezoid(integrand, taus))
+    return 3.0 * c0 - 9.0 * c1
 
 
-def _reference_precompute(N, dt, num_tau, tau_max_multiplier, include_c12):
+def _reference_precompute(N, dt, num_tau, tau_max_multiplier):
     M = 2 * N + 1
     eps = 2.0 / float(M)
     fft_modes = _fft_mode_numbers(M)
@@ -118,7 +102,7 @@ def _reference_precompute(N, dt, num_tau, tau_max_multiplier, include_c12):
     return {
         "lam_rfft": lam_rfft,
         "solver_denom": solver_denom,
-        **_compute_reference_constants(N, dt, num_tau, tau_max_multiplier, include_c12),
+        "Cmass": _compute_reference_cmass(N, num_tau, tau_max_multiplier),
     }
 
 
@@ -150,19 +134,21 @@ def test_phi43_precompute_matches_reference():
         dt=0.01,
         num_tau=8,
         tau_max_multiplier=4.0,
-        include_c12=True,
     )
 
     np.testing.assert_allclose(pre.lam_rfft.cpu().numpy(), ref["lam_rfft"], rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(
         pre.solver_denom.cpu().numpy(), ref["solver_denom"], rtol=1e-12, atol=1e-12
     )
-    np.testing.assert_allclose(
-        np.array([pre.C0, pre.C11, pre.C12, pre.C1, pre.Cmass]),
-        np.array([ref["C0"], ref["C11"], ref["C12"], ref["C1"], ref["Cmass"]]),
-        rtol=1e-12,
-        atol=1e-12,
+    np.testing.assert_allclose(pre.Cmass, ref["Cmass"], rtol=1e-12, atol=1e-12)
+
+
+def test_phi43_precompute_no_renormalization():
+    spde = SPDE3D(
+        N=1, dt=0.01, steps=2, num_tau=8, tau_max_multiplier=4.0, seed=7, renormalization=None
     )
+    pre = spde.precompute()
+    assert pre.Cmass == 0.0
 
 
 def test_phi43_fixed_noise_step_and_diagnostics_match_reference():

@@ -51,7 +51,7 @@ def build_save_dict(x, y, z, t, w, sol, spde, pre, save_single_path_tcxyz):
     return mdict
 
 
-def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, include_c12, seed=0):
+def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, renormalization, seed=0):
     spde = SPDE3D(
         N=N,
         dt=dt,
@@ -59,7 +59,7 @@ def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, include_c1
         seed=seed,
         num_tau=num_tau,
         tau_max_multiplier=tau_max_multiplier,
-        include_c12=include_c12,
+        renormalization=renormalization,
     )
     pre = spde.precompute()
 

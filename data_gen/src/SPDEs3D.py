@@ -1,9 +1,11 @@
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 import torch
+
+Renormalization = Literal["time_dependent", "invariant_measure"]
 
 
 @dataclass(frozen=True)
@@ -12,10 +14,6 @@ class Precomp3D:
     mode_numbers_rfft: torch.Tensor
     lam_rfft: torch.Tensor
     solver_denom: torch.Tensor
-    C0: float
-    C11: float
-    C12: float
-    C1: float
     Cmass: float
 
 
@@ -30,9 +28,13 @@ class SPDE3D:
         seed=0,
         num_tau=256,
         tau_max_multiplier=20.0,
-        include_c12=True,
+        renormalization: Optional[Renormalization] = "invariant_measure",
         device=None,
     ):
+        if renormalization not in (None, "time_dependent", "invariant_measure"):
+            raise ValueError(
+                f"renormalization must be None, 'time_dependent', or 'invariant_measure'; got {renormalization!r}"
+            )
         self.N = int(N)
         self.dt = float(dt)
         self.steps = int(steps)
@@ -41,7 +43,7 @@ class SPDE3D:
         self.seed = int(seed)
         self.num_tau = int(num_tau)
         self.tau_max_multiplier = float(tau_max_multiplier)
-        self.include_c12 = bool(include_c12)
+        self.renormalization: Optional[Renormalization] = renormalization
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.pre = None
 
@@ -139,7 +141,12 @@ class SPDE3D:
             torch.as_tensor(alias_lam, dtype=self._torch_dtype(), device=self.device),
         )
 
-    def compute_C0_C1(self):
+    def compute_Cmass(self):
+        if self.renormalization is None:
+            return 0.0
+        if self.renormalization == "time_dependent":
+            raise NotImplementedError("time_dependent renormalization is not yet implemented")
+
         centered_modes = torch.as_tensor(
             self._centered_mode_numbers(), dtype=self._torch_dtype(), device=self.device
         )
@@ -165,8 +172,7 @@ class SPDE3D:
 
         main_mask, alias_lam_full = self._paper_renorm_geometry()
         main_slice = slice(self.N, 3 * self.N + 1)
-        integrand11 = torch.empty(num_tau, dtype=self._torch_dtype(), device=self.device)
-        integrand12 = torch.empty(num_tau, dtype=self._torch_dtype(), device=self.device)
+        integrand = torch.empty(num_tau, dtype=self._torch_dtype(), device=self.device)
 
         positive_mask = lam_box > 0.0
         for i, tau in enumerate(taus):
@@ -176,25 +182,16 @@ class SPDE3D:
 
             conv_VV = self._linear_convolution_3d(V_box, V_box)
 
-            P_main_full = torch.zeros_like(conv_VV)
-            P_main_full[main_slice, main_slice, main_slice] = P_box
-            integrand11[i] = torch.sum(P_main_full * conv_VV)
+            P_full = torch.where(
+                main_mask,
+                torch.zeros((), dtype=self._torch_dtype(), device=self.device),
+                torch.exp(-tau * alias_lam_full),
+            )
+            P_full[main_slice, main_slice, main_slice] = P_box
+            integrand[i] = torch.sum(P_full * conv_VV)
 
-            if self.include_c12:
-                P_alias_full = torch.where(
-                    main_mask,
-                    torch.zeros((), dtype=self._torch_dtype(), device=self.device),
-                    torch.exp(-tau * alias_lam_full),
-                )
-                integrand12[i] = torch.sum(P_alias_full * conv_VV)
-            else:
-                integrand12[i] = 0.0
-
-        c11 = float((2.0 ** -5) * torch.trapezoid(integrand11, taus).item())
-        c12 = float((2.0 ** -5) * torch.trapezoid(integrand12, taus).item())
-        c1 = c11 + c12
-        cmass = 3.0 * c0 - 9.0 * c1
-        return c0, c11, c12, c1, cmass
+        c1 = float((2.0 ** -5) * torch.trapezoid(integrand, taus).item())
+        return 3.0 * c0 - 9.0 * c1
 
     def precompute(self):
         fft_modes = torch.as_tensor(
@@ -208,18 +205,13 @@ class SPDE3D:
             fft_modes, fft_modes, rfft_modes
         ).to(self._torch_dtype())
         solver_denom = (1.0 + self.dt * lam_rfft).to(self._torch_dtype())
-        C0, C11, C12, C1, Cmass = self.compute_C0_C1()
 
         self.pre = Precomp3D(
             mode_numbers_fft=fft_modes,
             mode_numbers_rfft=rfft_modes,
             lam_rfft=lam_rfft,
             solver_denom=solver_denom,
-            C0=C0,
-            C11=C11,
-            C12=C12,
-            C1=C1,
-            Cmass=Cmass,
+            Cmass=self.compute_Cmass(),
         )
         return self.pre
 

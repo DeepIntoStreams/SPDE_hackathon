@@ -6,7 +6,7 @@ sim:
   fix_u0: True  # [True, False] True--fix zero IC; False--vary IC across samples
   num_tau: 48
   tau_max_multiplier: 12.0
-  include_c12: True
+  renormalization: invariant_measure  # one of: invariant_measure, time_dependent, null
 
 seed: 42
 
