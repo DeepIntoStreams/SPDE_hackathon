@@ -14,7 +14,7 @@ from data_gen.src.NoiseND import NoiseND
 from data_gen.src.SPDEs import SPDE
 
 def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num, lam):
-    noise = NoiseND()
+    noise = NoiseND(basis="sincos", covariance="cylindrical")
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
     O_X = noise.partition_axis(a, b, dx)
     O_T = noise.partition_axis(s, t, dt)
@@ -24,20 +24,20 @@ def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num, lam):
     ic = lambda x: x*(1-x) # initial condition (fixed part)
     if not fix_u0: # varying initial condition
         X_ = np.linspace(-0.5,0.5,Nx+1)
-        ic_ = noise.initial(num, (X_,), scaling=1)[:, :]
+        ic_ = noise.initial(num, (X_,))[:, :]
         ic = 0.1*(ic_ - ic_[:,0,None]) + ic(O_X)
         print("u0 is varying!")
     else:
         print("u0 is fixed!")
 
-    W = noise.WN_space_time_many(
+    W = noise.WN_space_time(
         s,
         t,
         dt,
         bounds=((a, b),),
         steps=(dx,),
-        num=num,
         truncation=(truncation + 1,),
+        num=num,
     )
     Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic_reno(W, O_T, O_X, lam, truncation) # solve parabolic equation
 

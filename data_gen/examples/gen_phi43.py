@@ -22,7 +22,7 @@ def build_initial_conditions(num, grid, fix_u0):
         return np.zeros((num, len(grid), len(grid), len(grid)), dtype=np.float32)
 
     noise = NoiseND()
-    ic = 0.1 * noise.initial(num, (grid, grid, grid), scaling=1)
+    ic = 0.1 * noise.initial(num, (grid, grid, grid))
     ic = ic - ic[:, :1, :1, :1]
     print("u0 is varying!")
     return ic.astype(np.float32)
