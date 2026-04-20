@@ -5,8 +5,6 @@ from typing import Literal, Optional
 import numpy as np
 import torch
 
-Renormalization = Literal["time_dependent", "invariant_measure"]
-
 
 @dataclass(frozen=True)
 class Precomp3D:
@@ -15,6 +13,7 @@ class Precomp3D:
     lam_rfft: torch.Tensor
     solver_denom: torch.Tensor
     Cmass: float
+    Cmass_path: Optional[torch.Tensor] = None
 
 
 class SPDE3D:
@@ -28,7 +27,7 @@ class SPDE3D:
         seed=0,
         num_tau=256,
         tau_max_multiplier=20.0,
-        renormalization: Optional[Renormalization] = "invariant_measure",
+        renormalization: Literal["time_dependent", "invariant_measure"] = "invariant_measure",
         device=None,
     ):
         if renormalization not in (None, "time_dependent", "invariant_measure"):
@@ -43,7 +42,7 @@ class SPDE3D:
         self.seed = int(seed)
         self.num_tau = int(num_tau)
         self.tau_max_multiplier = float(tau_max_multiplier)
-        self.renormalization: Optional[Renormalization] = renormalization
+        self.renormalization: Literal["time_dependent", "invariant_measure"] = renormalization
         self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.pre = None
 
@@ -97,18 +96,14 @@ class SPDE3D:
         sx = np.sin(0.5 * math.pi * eps * kx) ** 2
         sy = np.sin(0.5 * math.pi * eps * ky) ** 2
         sz = np.sin(0.5 * math.pi * eps * kz) ** 2
-        return (4.0 / (eps * eps)) * (
-            sx[:, None, None] + sy[None, :, None] + sz[None, None, :]
-        )
+        return (4.0 / (eps * eps)) * (sx[:, None, None] + sy[None, :, None] + sz[None, None, :])
 
     def _laplacian_symbol_from_mode_numbers_torch(self, kx, ky, kz):
         eps = self.eps
         sx = torch.sin(0.5 * math.pi * eps * kx) ** 2
         sy = torch.sin(0.5 * math.pi * eps * ky) ** 2
         sz = torch.sin(0.5 * math.pi * eps * kz) ** 2
-        return (4.0 / (eps * eps)) * (
-            sx[:, None, None] + sy[None, :, None] + sz[None, None, :]
-        )
+        return (4.0 / (eps * eps)) * (sx[:, None, None] + sy[None, :, None] + sz[None, None, :])
 
     def _linear_convolution_3d(self, a, b):
         out_shape = tuple(int(sa + sb - 1) for sa, sb in zip(a.shape, b.shape))
@@ -141,11 +136,63 @@ class SPDE3D:
             torch.as_tensor(alias_lam, dtype=self._torch_dtype(), device=self.device),
         )
 
+    def _time_dependent_c0_path(self, times, lam_box):
+        positive_lam = lam_box[lam_box > 0.0]
+        if positive_lam.numel() == 0:
+            return torch.zeros_like(times)
+
+        decay = torch.exp(-2.0 * times[:, None] * positive_lam[None, :])
+        return (2.0**-3) * torch.sum((1.0 - decay) / (2.0 * positive_lam[None, :]), dim=1)
+
+    def _time_dependent_c1_path(self, times, lam_box):
+        num_times = int(times.shape[0])
+        cmass1 = torch.zeros(num_times, dtype=self._torch_dtype(), device=self.device)
+        if num_times == 0:
+            return cmass1
+
+        main_mask, alias_lam_full = self._paper_renorm_geometry()
+        main_slice = slice(self.N, 3 * self.N + 1)
+        positive_mask = lam_box > 0.0
+
+        for time_index, eval_time in enumerate(times):
+            eval_time_value = float(eval_time.item())
+            if eval_time_value <= 0.0:
+                continue
+
+            taus = torch.linspace(
+                0.0,
+                eval_time_value,
+                max(self.num_tau, 2),
+                dtype=self._torch_dtype(),
+                device=self.device,
+            )
+            integrand = torch.empty(taus.shape[0], dtype=self._torch_dtype(), device=self.device)
+
+            for tau_index, tau in enumerate(taus):
+                P_box_tau = torch.exp(-tau * lam_box)
+                V_box = torch.zeros_like(lam_box)
+                V_box[positive_mask] = (
+                    torch.exp(-tau * lam_box[positive_mask])
+                    - torch.exp(-(2.0 * eval_time - tau) * lam_box[positive_mask])
+                ) / (2.0 * lam_box[positive_mask])
+
+                conv_VV = self._linear_convolution_3d(V_box, V_box)
+
+                P_full = torch.where(
+                    main_mask,
+                    torch.zeros((), dtype=self._torch_dtype(), device=self.device),
+                    torch.exp(-tau * alias_lam_full),
+                )
+                P_full[main_slice, main_slice, main_slice] = P_box_tau
+                integrand[tau_index] = torch.sum(P_full * conv_VV)
+
+            cmass1[time_index] = (2.0**-5) * torch.trapezoid(integrand, taus)
+
+        return cmass1
+
     def compute_Cmass(self):
         if self.renormalization is None:
-            return 0.0
-        if self.renormalization == "time_dependent":
-            raise NotImplementedError("time_dependent renormalization is not yet implemented")
+            return 0.0, None
 
         centered_modes = torch.as_tensor(
             self._centered_mode_numbers(), dtype=self._torch_dtype(), device=self.device
@@ -154,9 +201,22 @@ class SPDE3D:
             centered_modes, centered_modes, centered_modes
         )
 
+        if self.renormalization == "time_dependent":
+            times = torch.linspace(
+                0.0,
+                self.steps * self.dt,
+                self.steps + 1,
+                dtype=self._torch_dtype(),
+                device=self.device,
+            )
+            c0_path = self._time_dependent_c0_path(times, lam_box)
+            c1_path = self._time_dependent_c1_path(times, lam_box)
+            cmass_path = 3.0 * c0_path - 9.0 * c1_path
+            return float(cmass_path[-1].item()), cmass_path
+
         lam_safe = lam_box.clone()
         lam_safe[self.N, self.N, self.N] = torch.inf
-        c0 = float((2.0 ** -3) * torch.sum(0.5 / lam_safe).item())
+        c0 = float((2.0**-3) * torch.sum(0.5 / lam_safe).item())
 
         positive_lam = lam_box[lam_box > 0.0]
         lam_min_pos = float(torch.min(positive_lam).item())
@@ -190,8 +250,8 @@ class SPDE3D:
             P_full[main_slice, main_slice, main_slice] = P_box
             integrand[i] = torch.sum(P_full * conv_VV)
 
-        c1 = float((2.0 ** -5) * torch.trapezoid(integrand, taus).item())
-        return 3.0 * c0 - 9.0 * c1
+        c1 = float((2.0**-5) * torch.trapezoid(integrand, taus).item())
+        return 3.0 * c0 - 9.0 * c1, None
 
     def precompute(self):
         fft_modes = torch.as_tensor(
@@ -206,12 +266,14 @@ class SPDE3D:
         ).to(self._torch_dtype())
         solver_denom = (1.0 + self.dt * lam_rfft).to(self._torch_dtype())
 
+        cmass, cmass_path = self.compute_Cmass()
         self.pre = Precomp3D(
             mode_numbers_fft=fft_modes,
             mode_numbers_rfft=rfft_modes,
             lam_rfft=lam_rfft,
             solver_denom=solver_denom,
-            Cmass=self.compute_Cmass(),
+            Cmass=cmass,
+            Cmass_path=cmass_path,
         )
         return self.pre
 
@@ -224,23 +286,30 @@ class SPDE3D:
 
     def _noise_real_space(self, generator=None):
         shape = (self.M, self.M, self.M)
-        scale = math.sqrt(self.dt) / (self.eps ** 1.5)
-        return torch.randn(
-            shape,
-            generator=generator,
-            device=self.device,
-            dtype=self._torch_dtype(),
-        ) * scale
+        scale = math.sqrt(self.dt) / (self.eps**1.5)
+        return (
+            torch.randn(
+                shape,
+                generator=generator,
+                device=self.device,
+                dtype=self._torch_dtype(),
+            )
+            * scale
+        )
 
     def _coerce_field(self, phi):
         if phi is None:
-            return torch.zeros((self.M, self.M, self.M), dtype=self._torch_dtype(), device=self.device)
+            return torch.zeros(
+                (self.M, self.M, self.M), dtype=self._torch_dtype(), device=self.device
+            )
         if isinstance(phi, torch.Tensor):
             field = phi.to(device=self.device, dtype=self._torch_dtype())
         else:
             field = torch.as_tensor(phi, dtype=self._torch_dtype(), device=self.device)
         if tuple(field.shape) != (self.M, self.M, self.M):
-            raise ValueError(f"phi0 must have shape {(self.M, self.M, self.M)}, got {tuple(field.shape)}.")
+            raise ValueError(
+                f"phi0 must have shape {(self.M, self.M, self.M)}, got {tuple(field.shape)}."
+            )
         return field
 
     def initial_condition(self):
@@ -295,7 +364,7 @@ class SPDE3D:
             traj.append(phi.clone())
 
         for step in range(self.steps):
-            phi = self._semi_implicit_step_from_noise(phi, noise[step], pre=pre)
+            phi = self._semi_implicit_step_from_noise(phi, noise[step], pre=pre, step=step)
             traj.append(phi.clone())
 
         if traj:
@@ -305,19 +374,25 @@ class SPDE3D:
             trajectory = torch.empty(shape, dtype=self._torch_dtype(), device=self.device)
         return phi, trajectory, noise
 
-    def _semi_implicit_step_from_noise(self, phi, noise, pre=None):
+    def _cmass_at_step(self, pre, step):
+        if pre.Cmass_path is None:
+            return pre.Cmass
+        step_index = max(min(int(step), pre.Cmass_path.shape[0] - 1), 0)
+        return float(pre.Cmass_path[step_index].item())
+
+    def _semi_implicit_step_from_noise(self, phi, noise, pre=None, step=0):
         pre = self._ensure_precomp(pre)
-        drift = -(phi ** 3) + pre.Cmass * phi
+        drift = -(phi**3) + self._cmass_at_step(pre, step) * phi
         rhs = phi + self.dt * drift + noise
         rhs_hat = torch.fft.rfftn(rhs, dim=(-3, -2, -1))
         phi_next_hat = rhs_hat / pre.solver_denom
         phi_next = torch.fft.irfftn(phi_next_hat, s=(self.M, self.M, self.M), dim=(-3, -2, -1))
         return phi_next.to(self._torch_dtype())
 
-    def semi_implicit_step(self, phi, generator=None, pre=None):
+    def semi_implicit_step(self, phi, generator=None, pre=None, step=0):
         phi = self._coerce_field(phi)
         noise = self._noise_real_space(generator=generator)
-        return self._semi_implicit_step_from_noise(phi, noise, pre=pre)
+        return self._semi_implicit_step_from_noise(phi, noise, pre=pre, step=step)
 
     def simulate(
         self,
@@ -354,14 +429,14 @@ class SPDE3D:
 
     def structure_factor(self, phi):
         phi = self._coerce_field(phi)
-        volume = self.L ** 3
+        volume = self.L**3
         hat_phi = torch.fft.rfftn(phi, dim=(-3, -2, -1))
         return (hat_phi * torch.conj(hat_phi)).real / volume
 
     def two_point_correlation(self, phi):
         phi = self._coerce_field(phi)
         power = torch.abs(torch.fft.fftn(phi, dim=(-3, -2, -1))) ** 2
-        return torch.fft.ifftn(power, dim=(-3, -2, -1)).real / float(self.M ** 3)
+        return torch.fft.ifftn(power, dim=(-3, -2, -1)).real / float(self.M**3)
 
     def to_tcxyz(self, snaps):
         snaps = torch.as_tensor(snaps, dtype=self._torch_dtype(), device=self.device)

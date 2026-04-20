@@ -45,10 +45,18 @@ def build_save_dict(x, y, z, t, w, sol, spde, pre, save_single_path_tcxyz):
         "eps": np.array(spde.eps, dtype=np.float64),
         "Cmass": np.array(pre.Cmass, dtype=np.float64),
     }
+    if pre.Cmass_path is not None:
+        mdict["Cmass_t"] = pre.Cmass_path.detach().cpu().numpy().astype(np.float64)
     if save_single_path_tcxyz:
         mdict["W_single_tcxyz"] = single_path_tcxyz(w).astype(np.float32)
         mdict["sol_single_tcxyz"] = single_path_tcxyz(sol).astype(np.float32)
     return mdict
+
+
+def resolve_save_dir(save_dir):
+    if osp.isabs(save_dir):
+        return save_dir
+    return osp.abspath(osp.join(current_directory, save_dir))
 
 
 def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, renormalization, seed=0):
@@ -90,10 +98,11 @@ def main(cfg: DictConfig):
 
     x, y, z, t, w, sol, spde, pre = simulator(**cfg.sim, seed=cfg.seed)
 
-    os.makedirs(cfg.save_dir, exist_ok=True)
+    save_dir = resolve_save_dir(cfg.save_dir)
+    os.makedirs(save_dir, exist_ok=True)
     ic_type = "xi" if cfg.sim.fix_u0 else "u0_xi"
     filename = f"{cfg.save_name}_{ic_type}_N{cfg.sim.N}_steps{cfg.sim.steps}_{cfg.sim.num}.mat"
-    save_path = os.path.join(cfg.save_dir, filename)
+    save_path = osp.join(save_dir, filename)
 
     mdict = build_save_dict(
         x=x,
