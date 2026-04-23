@@ -136,6 +136,7 @@ def main():
                         help='List all available metrics and exit')
     args = parser.parse_args()
 
+
     if args.list_metrics:
         list_metrics()
         return
@@ -160,7 +161,7 @@ def main():
     results = {}
     for filepath in args.files:
         u_real, u_pred = load_predictions(filepath)
-        scores = evaluate(u_real, u_pred, metrics)
+        scores = evaluate(u_real[..., 1:], u_pred[..., 1:], metrics, batch_size=20)
         # Remap keys to short names for display
         results[filepath] = {name_map[k]: v for k, v in scores.items()}
 

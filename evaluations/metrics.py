@@ -65,7 +65,7 @@ class CovarianceMetric(Metric):
 class AutoCorrelationMetric(Metric):
     """RMSE between autocorrelation functions."""
 
-    def __init__(self, max_lag=64, stationary=True, dim=(0, 1),
+    def __init__(self, max_lag=64, stationary=False, dim=(0, 1),
                  symmetric=False, transform=lambda x: x):
         self.transform = transform
         self.max_lag = max_lag
@@ -206,7 +206,7 @@ class LpLossMetric(Metric):
         if self.mode == 'abs':
             h = 1.0 / (x_real.size()[1] - 1.0)
             all_norms = (h ** (self.d / self.p)) * torch.norm(
-                x_pred.view(num_examples, -1) - x_real.view(num_examples, -1), self.p, 1)
+                x_pred.reshape(num_examples, -1) - x_real.reshape(num_examples, -1), self.p, 1)
             if self.reduction:
                 if self.size_average:
                     return torch.mean(all_norms)
