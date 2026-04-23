@@ -38,35 +38,33 @@ def acf_torch(x: torch.Tensor, max_lag: int, dim: Tuple[int] = (0, 1)) -> torch.
 
 def non_stationary_acf_torch(X, symmetric=False):
     """
-    Compute the correlation matrix between any two time points of the time series
     Parameters
     ----------
-    X (torch.Tensor): [B, T, D]
-    symmetric (bool): whether to return the upper triangular matrix of the full matrix
-
-    Returns
-    -------
-    Correlation matrix of the shape [T, T, D] where each entry (t_i, t_j, d_i) is the correlation between the d_i-th coordinate of X_{t_i} and X_{t_j}
+    X : torch.Tensor, shape [B, T, D]
+        Batch of time series.
+    symmetric : bool
+        If True, return full symmetric correlation matrix (including lower triangle and diagonal).
+        If False, return only upper triangular part (s < t) with zeros elsewhere (diagonal and lower triangle set to 0).
     """
-    # Get the batch size, sequence length, and input dimension from the input tensor
     B, T, D = X.shape
+    correlations = torch.zeros(T, T, D, device=X.device, dtype=X.dtype)
 
-    # Create a tensor to hold the correlations
-    correlations = torch.zeros(T, T, D)
-
-    for i in range(D):
-        # Compute the correlation between X_{t, d} and X_{t-tau, d}
-        if hasattr(torch, 'corrcoef'):  # version >= torch2.0
-            correlations[:, :, i] = torch.corrcoef(X[:, :, i].t())
+    for d in range(D):
+        # Extract time series for feature d across all samples: (B, T)
+        x_d = X[:, :, d]
+        # Compute correlation matrix (T, T) using torch.corrcoef
+        if hasattr(torch, 'corrcoef'):
+            corr_mat = torch.corrcoef(x_d.T)  # (T, T)
         else:
-            correlations[:, :, i] = torch.from_numpy(np.corrcoef(to_numpy(X[:, :, i]).T))
-
-    if not symmetric:
-        # Loop through each time step from lag to T-1
-        for t in range(T):
-            # Loop through each lag from 1 to lag
-            for tau in range(t + 1, T):
-                correlations[tau, t, :] = 0
+            corr_mat = torch.from_numpy(np.corrcoef(to_numpy(x_d).T)).to(X.device)
+        
+        if symmetric:
+            # Full symmetric matrix (including diagonal and lower triangle)
+            correlations[:, :, d] = corr_mat
+        else:
+            # Keep only upper triangular part (s < t), set diagonal and lower triangle to 0
+            triu_mask = torch.triu(torch.ones(T, T, device=X.device), diagonal=1).bool()
+            correlations[:, :, d] = corr_mat * triu_mask
 
     return correlations
 
@@ -79,10 +77,6 @@ def cacf_torch(x, lags: list, dim=(0, 1)):
     x
     lags
     dim
-
-    Returns
-    -------
-
     """
     # Define a helper function to get the lower triangular indices for a given dimension
     def get_lower_triangular_indices(n):
@@ -113,6 +107,34 @@ def cacf_torch(x, lags: list, dim=(0, 1)):
     # Concatenate the cross-correlations across lags and reshape to the desired output shape
     cacf = torch.cat(cacf_list, 1)
     return cacf.reshape(cacf.shape[0], -1, len(ind[0]))
+
+
+def non_stationary_cacf_torch(X):
+    """
+    Compute cross-correlation at lag 0 for each time step independently.
+    Parameters
+    ----------
+    X (torch.Tensor): [B, T, D]
+    """
+    N, T, D = X.shape
+    # Get indices for i < j
+    i_idx, j_idx = torch.triu_indices(D, D, offset=1, device=X.device)
+    M = len(i_idx)
+    
+    # Standardize and compute correlation per time step
+    corr_ts = torch.zeros(T, M, device=X.device, dtype=X.dtype)
+    for t in range(T):
+        X_t = X[:, t, :]                     # (N, D)
+        # Standardize across samples at this time step
+        mean_t = X_t.mean(dim=0, keepdim=True)
+        std_t = X_t.std(dim=0, keepdim=True)
+        X_t_std = (X_t - mean_t) / std_t  # (N, D)
+        # Correlation matrix (D, D)
+        corr_mat = torch.corrcoef(X_t_std.T)  # (D, D)
+        # Extract cross-correlations (i < j)
+        corr_ts[t] = corr_mat[i_idx, j_idx]
+    
+    return corr_ts 
 
 
 def rmse(x, y):
