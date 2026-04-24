@@ -50,19 +50,17 @@ def non_stationary_acf_torch(X, symmetric=False):
     correlations = torch.zeros(T, T, D, device=X.device, dtype=X.dtype)
 
     for d in range(D):
-        # Extract time series for feature d across all samples: (B, T)
-        x_d = X[:, :, d]
-        # Compute correlation matrix (T, T) using torch.corrcoef
-        if hasattr(torch, 'corrcoef'):
-            corr_mat = torch.corrcoef(x_d.T)  # (T, T)
-        else:
-            corr_mat = torch.from_numpy(np.corrcoef(to_numpy(x_d).T)).to(X.device)
-        
+        x_d = X[:, :, d]  
+        x_d_centered = x_d - x_d.mean(dim=0, keepdim=True)  
+
+        cov = (x_d_centered.T @ x_d_centered) / (B - 1)  
+        std = torch.sqrt(cov.diag() + 1e-8).unsqueeze(0)  
+        corr_mat = cov / (std.T * std + 1e-8)  
+        corr_mat = torch.clamp(corr_mat, -1.0, 1.0)
+
         if symmetric:
-            # Full symmetric matrix (including diagonal and lower triangle)
             correlations[:, :, d] = corr_mat
         else:
-            # Keep only upper triangular part (s < t), set diagonal and lower triangle to 0
             triu_mask = torch.triu(torch.ones(T, T, device=X.device), diagonal=1).bool()
             correlations[:, :, d] = corr_mat * triu_mask
 
@@ -109,7 +107,7 @@ def cacf_torch(x, lags: list, dim=(0, 1)):
     return cacf.reshape(cacf.shape[0], -1, len(ind[0]))
 
 
-def non_stationary_cacf_torch(X):
+def non_stationary_cacf_torch(X, lags=None, dim=None):
     """
     Compute cross-correlation at lag 0 for each time step independently.
     Parameters
@@ -128,13 +126,15 @@ def non_stationary_cacf_torch(X):
         # Standardize across samples at this time step
         mean_t = X_t.mean(dim=0, keepdim=True)
         std_t = X_t.std(dim=0, keepdim=True)
-        X_t_std = (X_t - mean_t) / std_t  # (N, D)
+        X_t_std = (X_t - mean_t) / (std_t + 1e-8)  # (N, D)
         # Correlation matrix (D, D)
         corr_mat = torch.corrcoef(X_t_std.T)  # (D, D)
         # Extract cross-correlations (i < j)
         corr_ts[t] = corr_mat[i_idx, j_idx]
-    
-    return corr_ts 
+        
+    # Replace NaNs (from zero-variance features) with 0 to avoid propagating NaNs
+    corr_ts = torch.nan_to_num(corr_ts, nan=0.0, posinf=0.0, neginf=0.0)
+    return corr_ts
 
 
 def rmse(x, y):

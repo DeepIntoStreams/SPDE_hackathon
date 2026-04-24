@@ -155,7 +155,7 @@ class SPDE2D():
         return Solution.astype('float32')
     
     
-    # Solve the equation \partial_t X_{\epsilon} - \Delta X_{\epsilon} = \xi_{\epsilon} with initial condition X_{\epsilon}(0,x,y) = v(0) = 0
+    # Solve the equation \partial_t X_{\epsilon} - \Delta X_{\epsilon} = \sigma * \xi_{\epsilon} with initial condition X_{\epsilon}(0,x,y) = v(0) = 0
     def FT_solver(self, W, T, X, Y, dW, dt):
         # u0 - initial condition
         # W - space time noise
@@ -200,7 +200,60 @@ class SPDE2D():
         num = X_eps.shape[0]
         T = X_eps.shape[1]
         a_eps = np.array([np.sum(X_eps[:, t, :, :] ** 2, axis=0) / num for t in range(T)])
-        print(np.max(np.abs(a_eps)))
+
+        return a_eps
+    
+    def Renormalize_Constant(self, X_eps, T=None, X=None, Y=None, Kx_max=None, Ky_max=None):
+        Nx = X_eps.shape[2]
+        Ny = X_eps.shape[3]
+        Nt = X_eps.shape[1]
+
+        # Wavenumber grids (non-negative integers only)
+        kx_vals = np.arange(0, Kx_max + 1)
+        ky_vals = np.arange(0, Ky_max + 1)
+        kx_grid, ky_grid = np.meshgrid(kx_vals, ky_vals, indexing='ij')
+        k_sq = kx_grid**2 + ky_grid**2
+
+        # Compute sigma_{kx,ky}^2 for all times
+        with np.errstate(divide='ignore', invalid='ignore'):
+            k_sq_exp = k_sq[..., np.newaxis]
+            T_exp = T[np.newaxis, np.newaxis, :]
+            term = np.where(
+                k_sq_exp == 0,
+                self.sigma ** 2 * T_exp,
+                self.sigma ** 2 / (2.0 * k_sq_exp) * (1.0 - np.exp(-2.0 * k_sq_exp * T_exp))
+            )
+
+        cos_x = np.cos(2.0 * np.outer(kx_vals, X))   # (Kx_max+1, Nx)
+        cos_y = np.cos(2.0 * np.outer(ky_vals, Y))   # (Ky_max+1, Ny)
+
+        cos_x_sub = cos_x[1:] if Kx_max >= 1 else np.empty((0, cos_x.shape[1]))
+        cos_y_sub = cos_y[1:] if Ky_max >= 1 else np.empty((0, cos_y.shape[1]))
+
+        a_eps = np.zeros((Nt, Nx, Ny))
+        for t_idx in tqdm(range(Nt)):
+            term_t = term[:, :, t_idx]
+            # start with (0,0) mode
+            val = term_t[0, 0] * np.ones((Nx, Ny))
+
+            # kx = 0, ky > 0  -> adds 2 * term[0,ky] * cos_y[ky,:]
+            if Ky_max is not None and Ky_max >= 1:
+                s_y = 2.0 * np.tensordot(term_t[0, 1:], cos_y[1:, :], axes=([0], [0]))
+                val += s_y[np.newaxis, :]
+
+            # ky = 0, kx > 0  -> adds 2 * term[kx,0] * cos_x[kx,:]
+            if Kx_max is not None and Kx_max >= 1:
+                s_x = 2.0 * np.tensordot(term_t[1:, 0], cos_x[1:, :], axes=([0], [0]))
+                val += s_x[:, np.newaxis]
+
+            # kx > 0, ky > 0 -> combined contribution
+            if (Kx_max is not None and Kx_max >= 1) and (Ky_max is not None and Ky_max >= 1):
+                term_sub = term_t[1:, 1:]
+                # einsum computes sum_{kx,ky} term_sub[kx,ky] * cos_x_sub[kx,:] * cos_y_sub[ky,:]
+                contrib = 4.0 * np.einsum('ij,ik,jl->kl', term_sub, cos_x_sub, cos_y_sub)
+                val += contrib
+
+            a_eps[t_idx, :, :] = val
 
         return a_eps
     
@@ -209,8 +262,8 @@ class SPDE2D():
     # dv = \Delta v * dt -:u^3: dt + 3*v dt with v(0) = 0, where :u^3: = v^3 + 3*v^2*X_{\epsilon} + 3*v*:X_{\epsilon}^2: + :X_{\epsilon}^3:
     # :X_{\epsilon}^2: = X_{\epsilon}^2 - a_{\epsilon}
     # :X_{\epsilon}^3: = X_{\epsilon}^3 - 3*X_{\epsilon}*a_{\epsilon}
-    def Renormalization(self, W, T=None, X=None, Y=None, diff=True):
-
+    def Renormalization(self, W, T=None, X=None, Y=None, diff=True, trcation=None):
+        
         # Extract specae-time increments and dW
         dW, dx, dy, dt = self.initialization(W, T, X, Y, diff)
 
@@ -218,7 +271,8 @@ class SPDE2D():
         X_eps = self.FT_solver(W, T, X, Y, dW, dt)
 
         # a_{\epsilon}
-        a_eps = self.MC(X_eps)
+        # a_eps = self.MC(X_eps)
+        a_eps = self.Renormalize_Constant(X_eps, T, X, Y, Kx_max=trcation, Ky_max=trcation)
 
         # :X_{\epsilon}^2:
         Xsquare = np.zeros(shape=W.shape)
