@@ -221,39 +221,23 @@ class SPDE2D():
             term = np.where(
                 k_sq_exp == 0,
                 self.sigma ** 2 * T_exp,
-                self.sigma ** 2 / (2.0 * k_sq_exp) * (1.0 - np.exp(-2.0 * k_sq_exp * T_exp))
+                self.sigma ** 2 / (2.0 * k_sq_exp * 4 * np.pi ** 2) * (1.0 - np.exp(-2.0 * k_sq_exp * 4 * np.pi ** 2 * T_exp))
             )
 
-        cos_x = np.cos(2.0 * np.outer(kx_vals, X))   # (Kx_max+1, Nx)
-        cos_y = np.cos(2.0 * np.outer(ky_vals, Y))   # (Ky_max+1, Ny)
+        # multiplicities: (0,0)=1, (kx>0,ky=0)=2, (kx=0,ky>0)=2, (kx>0,ky>0)=4
+        W = np.ones_like(kx_grid, dtype=float)
+        if Kx_max >= 1 and Ky_max >= 1:
+            W[1:, 1:] = 4.0
+        if Ky_max >= 1:
+            W[0, 1:] = 2.0
+        if Kx_max >= 1:
+            W[1:, 0] = 2.0
 
-        cos_x_sub = cos_x[1:] if Kx_max >= 1 else np.empty((0, cos_x.shape[1]))
-        cos_y_sub = cos_y[1:] if Ky_max >= 1 else np.empty((0, cos_y.shape[1]))
+        # term has shape (Kx+1, Ky+1, Nt); weighted sum over kx,ky -> (Nt,)
+        S = (W[..., None] * term).sum(axis=(0, 1))
 
-        a_eps = np.zeros((Nt, Nx, Ny))
-        for t_idx in tqdm(range(Nt)):
-            term_t = term[:, :, t_idx]
-            # start with (0,0) mode
-            val = term_t[0, 0] * np.ones((Nx, Ny))
-
-            # kx = 0, ky > 0  -> adds 2 * term[0,ky] * cos_y[ky,:]
-            if Ky_max is not None and Ky_max >= 1:
-                s_y = 2.0 * np.tensordot(term_t[0, 1:], cos_y[1:, :], axes=([0], [0]))
-                val += s_y[np.newaxis, :]
-
-            # ky = 0, kx > 0  -> adds 2 * term[kx,0] * cos_x[kx,:]
-            if Kx_max is not None and Kx_max >= 1:
-                s_x = 2.0 * np.tensordot(term_t[1:, 0], cos_x[1:, :], axes=([0], [0]))
-                val += s_x[:, np.newaxis]
-
-            # kx > 0, ky > 0 -> combined contribution
-            if (Kx_max is not None and Kx_max >= 1) and (Ky_max is not None and Ky_max >= 1):
-                term_sub = term_t[1:, 1:]
-                # einsum computes sum_{kx,ky} term_sub[kx,ky] * cos_x_sub[kx,:] * cos_y_sub[ky,:]
-                contrib = 4.0 * np.einsum('ij,ik,jl->kl', term_sub, cos_x_sub, cos_y_sub)
-                val += contrib
-
-            a_eps[t_idx, :, :] = val
+        # Broadcast to (Nt, Nx, Ny)
+        a_eps = S[:, None, None] * np.ones((Nt, Nx, Ny))
 
         return a_eps
     
@@ -271,8 +255,10 @@ class SPDE2D():
         X_eps = self.FT_solver(W, T, X, Y, dW, dt)
 
         # a_{\epsilon}
-        # a_eps = self.MC(X_eps)
+        # a_eps_mc = self.MC(X_eps)
+        # print(np.mean(a_eps[1,:,:]), np.max(a_eps[1,:,:]), np.min(a_eps[1,:,:]))
         a_eps = self.Renormalize_Constant(X_eps, T, X, Y, Kx_max=trcation, Ky_max=trcation)
+        
 
         # :X_{\epsilon}^2:
         Xsquare = np.zeros(shape=W.shape)

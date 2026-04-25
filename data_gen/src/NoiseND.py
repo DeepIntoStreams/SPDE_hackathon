@@ -143,6 +143,24 @@ class NoiseND:
 
     # Compute φ(jε) for each mode j = 1, 2, ..., n_modes.
     def _mollifier_scales(self, total_modes, epsilon):
+        # For the `sincos` basis the 1D mode indices are:
+        #  k=0 -> constant (cos(0x))  -> j=0
+        #  k=1 -> cos(1x)             -> j=1
+        #  k=2 -> sin(1x)             -> j=1
+        #  k=3 -> cos(2x)             -> j=2
+        #  k=4 -> sin(2x)             -> j=2
+        #  ... so harmonic j = 0 for i==0 else (i+1)//2 for i>=1.
+        if self.basis == "sincos":
+            scales = np.empty(total_modes, dtype=float)
+            for i in range(total_modes):
+                if i == 0:
+                    j = 0
+                else:
+                    j = (i + 1) // 2
+                scales[i] = self._phi_mollifier(j * epsilon)
+            return scales
+
+        # Default: map flat index i -> (i+1) * epsilon (preserves previous behaviour)
         return np.array([self._phi_mollifier((i + 1) * epsilon) for i in range(total_modes)])
 
     def initial(self, num, grids, truncation=10, decay=2):
