@@ -2,6 +2,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -64,6 +65,49 @@ def test_q_wiener_scales_modes_by_spectrum():
 
     assert np.allclose(basis_q[0], 0.5 * basis_cyl[0])
     assert np.allclose(basis_q[1:], basis_cyl[1:])
+
+
+def test_fourier_noise_is_real_with_conjugate_coefficients():
+    noise = NoiseND(basis="fourier")
+    np.random.seed(0)
+
+    w = noise.WN_space_time(
+        0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(1.0 / 6.0,), truncation=(5,)
+    )
+
+    assert np.isrealobj(w)
+    assert w.shape == (3, 7)
+    assert np.allclose(w[0], 0.0)
+
+
+def test_fourier_initial_condition_is_real_with_conjugate_coefficients():
+    noise = NoiseND(basis="fourier")
+    x = noise.partition_axis(0.0, 1.0, 1.0 / 6.0)
+    np.random.seed(0)
+
+    init = noise.initial(3, (x,), truncation=(5,))
+
+    assert np.isrealobj(init)
+    assert init.shape == (3, 7)
+    assert np.allclose(init[:, 0], init[:, -1])
+
+
+def test_fourier_truncation_must_be_odd():
+    noise = NoiseND(basis="fourier")
+
+    with pytest.raises(ValueError, match="fourier truncation must be odd"):
+        noise.WN_space_time(
+            0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(0.25,), truncation=(4,)
+        )
+
+
+def test_fourier_truncation_must_not_alias_grid():
+    noise = NoiseND(basis="fourier")
+
+    with pytest.raises(ValueError, match="unique periodic grid points"):
+        noise.WN_space_time(
+            0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(0.25,), truncation=(7,)
+        )
 
 
 def test_sin_basis_vanishes_on_interval_endpoints():
