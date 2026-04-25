@@ -80,23 +80,16 @@ class NoiseND:
         mode_shape = self._normalize_truncation(truncation, len(grids))
         lengths = tuple(float(step) * (g.size - 1) for g, step in zip(grids, steps))
         basis = self._spatial_basis(grids, mode_shape, lengths)
-        total_modes = int(np.prod(mode_shape))
+
+        def sample():
+            bm = self._brownian_coefficients(s, t, dt, mode_shape)
+            noise = np.einsum("tm,m...->t...", bm, basis, optimize=True)
+            return noise.real if self.basis == "fourier" else noise
 
         if num is None:
-            bm = self._brownian(s, t, dt, total_modes)
-            return np.einsum("tm,m...->t...", bm, basis, optimize=True)
+            return sample()
 
-        return np.stack(
-            [
-                np.einsum(
-                    "tm,m...->t...",
-                    self._brownian(s, t, dt, total_modes),
-                    basis,
-                    optimize=True,
-                )
-                for _ in tqdm(range(num))
-            ]
-        )
+        return np.stack([sample() for _ in tqdm(range(num))])
 
     def initial(self, num, grids, truncation=10, decay=2):
         grids = tuple(np.asarray(g, dtype=float) for g in grids)
@@ -105,12 +98,21 @@ class NoiseND:
         basis = self._spatial_basis(grids, mode_shape, lengths)
         total_modes = int(np.prod(mode_shape))
 
-        idx = np.indices(mode_shape).reshape(len(mode_shape), -1) + 1
-        weights = 1.0 / (1.0 + np.sum(idx.astype(float) ** decay, axis=0))
-        coeffs = np.random.normal(size=(num, total_modes)) * weights
-        return np.einsum("nm,m...->n...", coeffs, basis, optimize=True)
+        if self.basis == "fourier":
+            coeffs = self._fourier_initial_coefficients(num, mode_shape, decay)
+        else:
+            idx = np.indices(mode_shape).reshape(len(mode_shape), -1) + 1
+            weights = 1.0 / (1.0 + np.sum(idx.astype(float) ** decay, axis=0))
+            coeffs = np.random.normal(size=(num, total_modes)) * weights
+        init = np.einsum("nm,m...->n...", coeffs, basis, optimize=True)
+        return init.real if self.basis == "fourier" else init
 
     def _spatial_basis(self, grids, mode_shape, lengths):
+        if self.basis == "fourier":
+            if any(n % 2 == 0 for n in mode_shape):
+                raise ValueError("fourier truncation must be odd in every dimension")
+            if any(n > g.size - 1 for n, g in zip(mode_shape, grids)):
+                raise ValueError("fourier truncation must not exceed unique periodic grid points")
         factors = [
             self._basis_1d(np.asarray(g, dtype=float), n, L)
             for g, n, L in zip(grids, mode_shape, lengths)
@@ -133,9 +135,17 @@ class NoiseND:
 
         scales = np.empty(total_modes, dtype=float)
         for flat_index, mode_index in enumerate(np.ndindex(mode_shape)):
-            modes = tuple(index + 1 for index in mode_index)
+            if self.basis == "fourier":
+                modes = tuple(abs(index - n // 2) for index, n in zip(mode_index, mode_shape))
+            else:
+                modes = tuple(index + 1 for index in mode_index)
             scales[flat_index] = np.sqrt(float(self._q_spectrum(modes, lengths)))
         return scales
+
+    def _brownian_coefficients(self, start, stop, dt, mode_shape):
+        if self.basis == "fourier":
+            return self._fourier_brownian(start, stop, dt, mode_shape)
+        return self._brownian(start, stop, dt, int(np.prod(mode_shape)))
 
     @staticmethod
     def _brownian(start, stop, dt, n_modes):
@@ -143,6 +153,30 @@ class NoiseND:
         incr = np.random.normal(scale=np.sqrt(dt), size=(n_steps, n_modes))
         incr[0] = 0
         return np.cumsum(incr, axis=0)
+
+    @staticmethod
+    def _fourier_brownian(start, stop, dt, mode_shape):
+        n_steps = int((stop - start) / dt) + 1
+        incr = np.random.normal(scale=np.sqrt(dt / 2.0), size=(n_steps, *mode_shape))
+        incr = incr + 1j * np.random.normal(scale=np.sqrt(dt / 2.0), size=(n_steps, *mode_shape))
+        incr[0] = 0
+        coeffs = NoiseND._conjugate_symmetrize(np.cumsum(incr, axis=0), len(mode_shape))
+        return coeffs.reshape(n_steps, -1)
+
+    @staticmethod
+    def _fourier_initial_coefficients(num, mode_shape, decay):
+        half = np.array(mode_shape) // 2
+        centered = np.indices(mode_shape) - half.reshape((len(mode_shape),) + (1,) * len(mode_shape))
+        weights = 1.0 / (1.0 + np.sum(np.abs(centered) ** decay, axis=0))
+        coeffs = np.random.normal(size=(num, *mode_shape)) + 1j * np.random.normal(size=(num, *mode_shape))
+        coeffs /= np.sqrt(2.0)
+        coeffs = NoiseND._conjugate_symmetrize(coeffs * weights, len(mode_shape))
+        return coeffs.reshape(num, -1)
+
+    @staticmethod
+    def _conjugate_symmetrize(values, mode_dim):
+        axes = tuple(range(values.ndim - mode_dim, values.ndim))
+        return (values + np.conj(np.flip(values, axis=axes))) / np.sqrt(2.0)
 
     @staticmethod
     def _normalize_truncation(truncation, dim):
