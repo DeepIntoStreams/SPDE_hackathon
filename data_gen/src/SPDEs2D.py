@@ -194,14 +194,14 @@ class SPDE2D():
         return Solution
     
 
-    # Computing the expectation of X_{\epsilon}^2 by Monte Carlo
-    def MC(self, X_eps):
+    # # Computing the expectation of X_{\epsilon}^2 by Monte Carlo
+    # def MC(self, X_eps):
 
-        num = X_eps.shape[0]
-        T = X_eps.shape[1]
-        a_eps = np.array([np.sum(X_eps[:, t, :, :] ** 2, axis=0) / num for t in range(T)])
+    #     num = X_eps.shape[0]
+    #     T = X_eps.shape[1]
+    #     a_eps = np.array([np.sum(X_eps[:, t, :, :] ** 2, axis=0) / num for t in range(T)])
 
-        return a_eps
+    #     return a_eps
     
     def Renormalize_Constant(self, X_eps, T=None, X=None, Y=None, Kx_max=None, Ky_max=None):
         Nx = X_eps.shape[2]
@@ -223,6 +223,18 @@ class SPDE2D():
                 self.sigma ** 2 * T_exp,
                 self.sigma ** 2 / (2.0 * k_sq_exp * 4 * np.pi ** 2) * (1.0 - np.exp(-2.0 * k_sq_exp * 4 * np.pi ** 2 * T_exp))
             )
+
+        # # New computation with lambda_k = 4*N_x^2*sin^2(pi*k_x/N_x) + 4*N_y^2*sin^2(pi*k_y/N_y)
+        # lambda_k = 4.0 * Kx_max**2 * np.sin(np.pi * kx_grid / Kx_max)**2 + 4.0 * Ky_max**2 * np.sin(np.pi * ky_grid / Ky_max)**2
+
+        # with np.errstate(divide='ignore', invalid='ignore'):
+        #     lambda_k_exp = lambda_k[..., np.newaxis]
+        #     T_exp = T[np.newaxis, np.newaxis, :]
+        #     term_new = np.where(
+        #         lambda_k_exp == 0,
+        #         self.sigma ** 2 * T_exp,
+        #         self.sigma ** 2 / (2.0 * lambda_k_exp) * (1.0 - np.exp(-2.0 * lambda_k_exp * T_exp))
+        #     )
 
         # multiplicities: (0,0)=1, (kx>0,ky=0)=2, (kx=0,ky>0)=2, (kx>0,ky>0)=4
         W = np.ones_like(kx_grid, dtype=float)
@@ -255,10 +267,7 @@ class SPDE2D():
         X_eps = self.FT_solver(W, T, X, Y, dW, dt)
 
         # a_{\epsilon}
-        # a_eps_mc = self.MC(X_eps)
-        # print(np.mean(a_eps[1,:,:]), np.max(a_eps[1,:,:]), np.min(a_eps[1,:,:]))
-        a_eps = self.Renormalize_Constant(X_eps, T, X, Y, Kx_max=trcation, Ky_max=trcation)
-        
+        a_eps= self.Renormalize_Constant(X_eps, T, X, Y, Kx_max=trcation, Ky_max=trcation)  
 
         # :X_{\epsilon}^2:
         Xsquare = np.zeros(shape=W.shape)
