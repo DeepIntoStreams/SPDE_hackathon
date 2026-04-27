@@ -60,16 +60,15 @@ class CovarianceMetric(Metric):
         cov_real = stats.cov_torch(self.transform(x_real))
         cov_pred = stats.cov_torch(self.transform(x_pred))
         return torch.abs(cov_pred - cov_real.to(cov_pred.device)).mean()
-
+    
 
 class AutoCorrelationMetric(Metric):
-    """RMSE between autocorrelation functions."""
+    """Mean absolute difference between autocorrelation/correlation matrices."""
 
-    def __init__(self, max_lag=64, stationary=True, dim=(0, 1),
-                 symmetric=False, transform=lambda x: x):
+    def __init__(self, transform=lambda x: x, stationary=False, max_lag=64, dim=(0, 1), symmetric=True):
         self.transform = transform
-        self.max_lag = max_lag
         self.stationary = stationary
+        self.max_lag = max_lag
         self.dim = dim
         self.symmetric = symmetric
 
@@ -78,21 +77,30 @@ class AutoCorrelationMetric(Metric):
         return 'AcfMetric'
 
     def measure(self, x_real, x_pred):
-        t = self.transform
-        if self.stationary:
-            acf_real = stats.acf_torch(t(x_real), max_lag=self.max_lag, dim=self.dim)
-            acf_pred = stats.acf_torch(t(x_pred), max_lag=self.max_lag, dim=self.dim)
-        else:
-            acf_real = stats.non_stationary_acf_torch(t(x_real), self.symmetric)
-            acf_pred = stats.non_stationary_acf_torch(t(x_pred), self.symmetric)
-        return (acf_pred - acf_real.to(acf_pred.device)).pow(2).mean().sqrt()
+        x_real_t = self.transform(x_real)
+        x_pred_t = self.transform(x_pred)
 
+        if self.stationary:
+            acf_real = stats.acf_torch(x_real_t, max_lag=self.max_lag, dim=self.dim)  
+            acf_pred = stats.acf_torch(x_pred_t, max_lag=self.max_lag, dim=self.dim)
+            return torch.abs(acf_pred - acf_real).mean()
+        else:
+            corr_real = stats.non_stationary_acf_torch(x_real_t, self.symmetric)  
+            corr_pred = stats.non_stationary_acf_torch(x_pred_t, self.symmetric)
+            T = corr_real.shape[0]
+            s_idx, t_idx = torch.triu_indices(T, T, offset=1, device=corr_real.device)
+            # Extract correlations for strictly upper triangular pairs
+            real_pairs = corr_real[s_idx, t_idx, :]  
+            pred_pairs = corr_pred[s_idx, t_idx, :]
+            return torch.abs(pred_pairs - real_pairs).mean()
+    
 
 class CrossCorrelationMetric(Metric):
     """Mean absolute difference between cross-correlation tensors."""
 
-    def __init__(self, lags=64, dim=(0, 1), transform=lambda x: x):
+    def __init__(self, transform=lambda x: x, stationary=False, lags=64, dim=(0, 1)):
         self.transform = transform
+        self.stationary = stationary
         self.lags = lags
         self.dim = dim
 
@@ -101,8 +109,16 @@ class CrossCorrelationMetric(Metric):
         return 'CrossCorrMetric'
 
     def measure(self, x_real, x_pred):
-        cc_real = stats.cacf_torch(self.transform(x_real), self.lags, self.dim)
-        cc_pred = stats.cacf_torch(self.transform(x_pred), self.lags, self.dim)
+        x_real_t = self.transform(x_real)
+        x_pred_t = self.transform(x_pred)
+        
+        if self.stationary:
+            cc_real = stats.cacf_torch(x_real_t, self.lags, self.dim)
+            cc_pred = stats.cacf_torch(x_pred_t, self.lags, self.dim)
+        else:
+            cc_real = stats.non_stationary_cacf_torch(x_real_t, lags=self.lags, dim=self.dim)
+            cc_pred = stats.non_stationary_cacf_torch(x_pred_t, lags=self.lags, dim=self.dim)
+            
         return torch.abs(cc_pred - cc_real.to(cc_pred.device)).mean()
 
 
@@ -206,7 +222,7 @@ class LpLossMetric(Metric):
         if self.mode == 'abs':
             h = 1.0 / (x_real.size()[1] - 1.0)
             all_norms = (h ** (self.d / self.p)) * torch.norm(
-                x_pred.view(num_examples, -1) - x_real.view(num_examples, -1), self.p, 1)
+                x_pred.reshape(num_examples, -1) - x_real.reshape(num_examples, -1), self.p, 1)
             if self.reduction:
                 if self.size_average:
                     return torch.mean(all_norms)

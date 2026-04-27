@@ -1,55 +1,100 @@
+from __future__ import annotations
 import string
+from typing import Callable, Tuple, Union, Literal
 
 import numpy as np
+from scipy import integrate
 from tqdm import tqdm
+
+Basis1D = Callable[[np.ndarray, int, float], np.ndarray]
+SpectrumFn = Callable[[Tuple[int, ...], Tuple[float, ...]], float]
+
+
+def _sin_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
+    """Dirichlet: sqrt(2/L) sin(k pi (x-x0) / L), k = 1..N."""
+    k = np.arange(1, n_modes + 1, dtype=float)
+    shifted = grid - grid[0]
+    return np.sqrt(2.0 / length) * np.sin(np.pi * np.outer(k, shifted) / length)
+
+
+def _sincos_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
+    """Periodic (real Fourier): [1, cos_1, sin_1, cos_2, sin_2, ...] truncated to N modes."""
+    shifted = grid - grid[0]
+    basis = np.empty((n_modes, grid.size))
+    for k in range(n_modes):
+        if k == 0:
+            basis[k] = 1.0 / np.sqrt(length)
+            continue
+        harmonic = (k + 1) // 2
+        angle = 2.0 * np.pi * harmonic * shifted / length
+        basis[k] = np.sqrt(2.0 / length) * (np.cos(angle) if k % 2 == 1 else np.sin(angle))
+    return basis
+
+
+def _fourier_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
+    """Periodic (complex Fourier): (1/sqrt(L)) exp(i 2 pi n (x-x0) / L), n centred on 0."""
+    shifted = grid - grid[0]
+    start = -(n_modes // 2)
+    n = np.arange(start, start + n_modes, dtype=float)
+    return np.exp(1j * 2.0 * np.pi * np.outer(n, shifted) / length) / np.sqrt(length)
+
+
+_BASIS_FNS: dict[str, Basis1D] = {
+    "sin": _sin_basis,
+    "sincos": _sincos_basis,
+    "fourier": _fourier_basis,
+}
 
 
 class NoiseND:
-    def partition_axis(self, a, b, step):
+    """N-dimensional SPDE noise from tensor products of 1D spectral bases."""
+
+    def __init__(
+        self,
+        basis: Literal["sin", "sincos", "fourier"] = "sincos",
+        covariance: Literal["cylindrical", "q_wiener"] = "cylindrical",
+        q_spectrum: SpectrumFn | None = None,
+    ):
+        if basis not in _BASIS_FNS:
+            raise ValueError(f"basis must be one of {list(_BASIS_FNS)}; got {basis!r}")
+        if covariance not in {"cylindrical", "q_wiener"}:
+            raise ValueError("covariance must be 'cylindrical' or 'q_wiener'")
+        if covariance == "q_wiener" and q_spectrum is None:
+            raise ValueError("q_spectrum is required when covariance='q_wiener'")
+        if covariance == "cylindrical" and q_spectrum is not None:
+            raise ValueError("q_spectrum is only valid when covariance='q_wiener'")
+        self.basis = basis
+        self.covariance = covariance
+        self._basis_1d = _BASIS_FNS[basis]
+        self._q_spectrum = q_spectrum
+        self._R = self._compute_R()
+
+    @staticmethod
+    def partition_axis(a: float, b: float, step: float) -> np.ndarray:
         return np.linspace(a, b, int((b - a) / step) + 1)
 
-    def partition_nd(self, bounds, steps):
-        bounds = tuple(bounds)
-        steps = tuple(steps)
+    def partition_nd(self, bounds, steps) -> tuple[np.ndarray, ...]:
         if len(bounds) != len(steps):
             raise ValueError("bounds and steps must have the same length")
+        return tuple(self.partition_axis(a, b, s) for (a, b), s in zip(bounds, steps))
 
-        return tuple(
-            self.partition_axis(start, stop, step)
-            for (start, stop), step in zip(bounds, steps)
-        )
 
-    def brownian_motion(self, start, stop, dt, mode_shape):
-        mode_shape = tuple(int(m) for m in mode_shape)
-        n_steps = int((stop - start) / dt) + 1
-        increments = np.random.normal(
-            scale=np.sqrt(dt), size=(n_steps, int(np.prod(mode_shape)))
-        )
-        increments[0] = 0
-        return np.cumsum(increments, axis=0)
-
-    def WN_space_time_single(self, s, t, dt, bounds, steps, truncation, correlation=None):
-        steps = tuple(float(step) for step in steps)
+    def WN_space_time(self, s, t, dt, bounds, steps, truncation, num=None):
         grids = self.partition_nd(bounds, steps)
         mode_shape = self._normalize_truncation(truncation, len(grids))
-        lengths = tuple(step * (len(grid) - 1) for grid, step in zip(grids, steps))
-        basis = self._build_spatial_basis(grids, mode_shape, lengths, correlation)
-        brownian = self.brownian_motion(s, t, dt, mode_shape)
-        return np.einsum("tm,m...->t...", brownian, basis, optimize=True)
+        lengths = tuple(float(step) * (g.size - 1) for g, step in zip(grids, steps))
+        basis = self._spatial_basis(grids, mode_shape, lengths)
+        total_modes = int(np.prod(mode_shape))
 
-    def WN_space_time_many(
-        self, s, t, dt, bounds, steps, num, truncation, correlation=None
-    ):
-        steps = tuple(float(step) for step in steps)
-        grids = self.partition_nd(bounds, steps)
-        mode_shape = self._normalize_truncation(truncation, len(grids))
-        lengths = tuple(step * (len(grid) - 1) for grid, step in zip(grids, steps))
-        basis = self._build_spatial_basis(grids, mode_shape, lengths, correlation)
-        return np.array(
+        if num is None:
+            bm = self._brownian(s, t, dt, total_modes)
+            return np.einsum("tm,m...->t...", bm, basis, optimize=True)
+
+        return np.stack(
             [
                 np.einsum(
                     "tm,m...->t...",
-                    self.brownian_motion(s, t, dt, mode_shape),
+                    self._brownian(s, t, dt, total_modes),
                     basis,
                     optimize=True,
                 )
@@ -57,83 +102,126 @@ class NoiseND:
             ]
         )
 
-    def initial(self, num, grids, truncation=10, decay=2, scaling=1, dirichlet=False):
-        grids = tuple(np.asarray(grid) for grid in grids)
-        dim = len(grids)
-        mode_limits = self._normalize_truncation(truncation, dim)
-        grid_shape = tuple(len(grid) for grid in grids)
-        meshes = np.meshgrid(*grids, indexing="ij")
-        scales = tuple(self._grid_scale(grid, scaling) for grid in grids)
-        mode_ranges = [np.arange(-limit, limit + 1) for limit in mode_limits]
-        basis = np.empty(tuple(len(rng) for rng in mode_ranges) + grid_shape)
-        signs = tuple(-1 if axis % 2 else 1 for axis in range(dim))
 
-        for basis_index in np.ndindex(*(len(rng) for rng in mode_ranges)):
-            modes = tuple(mode_ranges[axis][index] for axis, index in enumerate(basis_index))
-            phase = np.zeros(grid_shape)
-            for mesh, scale, mode, sign in zip(meshes, scales, modes, signs):
-                phase += sign * mode * np.pi * mesh / (scale * dim)
-            weight = 1 + sum(np.abs(mode) ** decay for mode in modes)
-            basis[basis_index] = np.sin(phase) / weight
+    def WN_space_time_KPZ(self, s, t, dt, bounds, steps, truncation, num=None):
 
-        basis_flat = basis.reshape(int(np.prod([len(rng) for rng in mode_ranges])), *grid_shape)
+        grids = self.partition_nd(bounds, steps)
+        mode_shape = self._normalize_truncation(truncation, len(grids))
+        lengths = tuple(float(step) * (g.size - 1) for g, step in zip(grids, steps))
+        basis = self._spatial_basis(grids, mode_shape, lengths)
+        total_modes = int(np.prod(mode_shape))
+        eps_truncation = truncation if np.isscalar(truncation) else truncation[0]
+        epsilon = 1.0 / eps_truncation
+        
+        # Apply exponential mollifier scaling to basis
+        mollifier_scales = self._mollifier_scales(total_modes, epsilon)
+        basis = basis * mollifier_scales.reshape((-1,) + (1,) * len(grids))
+        
+        if num is None:
+            bm = self._brownian(s, t, dt, total_modes)
+            return np.einsum("tm,m...->t...", bm, basis, optimize=True)
 
-        all_coeffs = np.random.normal(size=(num, basis_flat.shape[0]))
-        initial_conditions = np.einsum("nm,m...->n...", all_coeffs, basis_flat, optimize=True)
-        if not dirichlet:
-            initial_conditions += np.random.normal(size=(num,) + (1,) * dim)
-        if dim == 1:
-            initial_conditions[:, -1] = initial_conditions[:, 0]
+        return np.stack(
+            [
+                np.einsum(
+                    "tm,m...->t...",
+                    self._brownian(s, t, dt, total_modes),
+                    basis,
+                    optimize=True,
+                )
+                for _ in tqdm(range(num))
+            ]
+        )
 
-        return initial_conditions
+    # Exponential mollifier: φ(x) = exp(1 - 1/(1-(x/R)²)) for |x| < R, else 0.
+    def _phi_mollifier(self, x: float) -> float:
+        abs_x = abs(x)
+        if abs_x >= self._R:
+            return 0.0
+        ratio = abs_x / self._R
+        return float(np.exp(1.0 - 1.0 / (1.0 - ratio**2)))
 
-    def _build_spatial_basis(self, grids, mode_shape, lengths, correlation):
-        grid_shape = tuple(len(grid) for grid in grids)
-        n_modes = int(np.prod(mode_shape))
+    # Compute φ(jε) for each mode j = 1, 2, ..., n_modes.
+    def _mollifier_scales(self, total_modes, epsilon):
+        # For the `sincos` basis the 1D mode indices are:
+        #  k=0 -> constant (cos(0x))  -> j=0
+        #  k=1 -> cos(1x)             -> j=1
+        #  k=2 -> sin(1x)             -> j=1
+        #  k=3 -> cos(2x)             -> j=2
+        #  k=4 -> sin(2x)             -> j=2
+        #  ... so harmonic j = 0 for i==0 else (i+1)//2 for i>=1.
+        if self.basis == "sincos":
+            scales = np.empty(total_modes, dtype=float)
+            for i in range(total_modes):
+                if i == 0:
+                    j = 0
+                else:
+                    j = (i + 1) // 2
+                scales[i] = self._phi_mollifier(j * epsilon)
+            return scales
 
-        if correlation is None:
-            factors = []
-            for grid, n_modes_axis, length in zip(grids, mode_shape, lengths):
-                modes = np.arange(n_modes_axis, dtype=float)
-                factors.append(np.sin(np.pi * np.outer(modes, grid) / length))
+        # Default: map flat index i -> (i+1) * epsilon (preserves previous behaviour)
+        return np.array([self._phi_mollifier((i + 1) * epsilon) for i in range(total_modes)])
 
-            mode_labels = self._axis_labels("m", len(grids))
-            coord_labels = self._axis_labels("x", len(grids))
-            equation = ",".join(
-                f"{mode_label}{coord_label}"
-                for mode_label, coord_label in zip(mode_labels, coord_labels)
-            )
-            equation += "->" + "".join(mode_labels + coord_labels)
-            scale = np.sqrt((2 ** len(lengths)) / np.prod(lengths))
-            basis = scale * np.einsum(equation, *factors, optimize=True)
-            return basis.reshape(n_modes, *grid_shape)
+    def initial(self, num, grids, truncation=10, decay=2):
+        grids = tuple(np.asarray(g, dtype=float) for g in grids)
+        mode_shape = self._normalize_truncation(truncation, len(grids))
+        lengths = tuple(float(g[-1] - g[0]) for g in grids)
+        basis = self._spatial_basis(grids, mode_shape, lengths)
+        total_modes = int(np.prod(mode_shape))
 
-        coord_meshes = np.meshgrid(*grids, indexing="ij")
-        basis = np.empty((n_modes,) + grid_shape)
-        for flat_index, modes in enumerate(np.ndindex(mode_shape)):
-            basis[flat_index] = correlation(coord_meshes, modes, lengths)
-        return basis
+        idx = np.indices(mode_shape).reshape(len(mode_shape), -1) + 1
+        weights = 1.0 / (1.0 + np.sum(idx.astype(float) ** decay, axis=0))
+        coeffs = np.random.normal(size=(num, total_modes)) * weights
+        return np.einsum("nm,m...->n...", coeffs, basis, optimize=True)
 
-    def _grid_scale(self, grid, scaling):
-        scale = float(np.max(grid)) / scaling if scaling else float(np.max(grid))
-        return scale if scale != 0 else 1.0
+    def _spatial_basis(self, grids, mode_shape, lengths):
+        factors = [
+            self._basis_1d(np.asarray(g, dtype=float), n, L)
+            for g, n, L in zip(grids, mode_shape, lengths)
+        ]
+        d = len(factors)
+        if d > 13:
+            raise ValueError(f"dimension {d} exceeds einsum label budget")
+        modes = string.ascii_lowercase[:d]
+        coords = string.ascii_lowercase[13 : 13 + d]
+        eq = ",".join(m + c for m, c in zip(modes, coords)) + f"->{modes}{coords}"
+        basis = np.einsum(eq, *factors, optimize=True)
+        basis = basis.reshape(int(np.prod(mode_shape)), *[g.size for g in grids])
+        mode_scales = self._mode_scales(mode_shape, lengths)
+        return basis * mode_scales.reshape((-1,) + (1,) * len(grids))
 
-    def _normalize_truncation(self, truncation, dim):
-        if np.isscalar(truncation):
-            values = (int(truncation),) * dim
-        else:
-            values = tuple(int(value) for value in truncation)
+    def _mode_scales(self, mode_shape, lengths):
+        total_modes = int(np.prod(mode_shape))
+        if self.covariance == "cylindrical":
+            return np.ones(total_modes, dtype=float)
 
-        if len(values) != dim:
-            raise ValueError("truncation must provide one value per spatial dimension")
-        if any(value < 1 for value in values):
-            raise ValueError("truncation values must be positive")
+        scales = np.empty(total_modes, dtype=float)
+        for flat_index, mode_index in enumerate(np.ndindex(mode_shape)):
+            modes = tuple(index + 1 for index in mode_index)
+            scales[flat_index] = np.sqrt(float(self._q_spectrum(modes, lengths)))
+        return scales
+
+    @staticmethod
+    def _brownian(start, stop, dt, n_modes):
+        n_steps = int((stop - start) / dt) + 1
+        incr = np.random.normal(scale=np.sqrt(dt), size=(n_steps, n_modes))
+        incr[0] = 0
+        return np.cumsum(incr, axis=0)
+
+    @staticmethod
+    def _normalize_truncation(truncation, dim):
+        values = (int(truncation),) * dim if np.isscalar(truncation) else tuple(int(v) for v in truncation)
+        if len(values) != dim or any(v < 1 for v in values):
+            raise ValueError("truncation must be a positive int or tuple of positive ints, one per spatial dimension")
         return values
 
-    def _axis_labels(self, prefix, dim):
-        start = string.ascii_lowercase.index(prefix)
-        if start + dim > 26:
-            raise ValueError(
-                f"Too many spatial dimensions ({dim}) for einsum labels with prefix '{prefix}'"
-            )
-        return list(string.ascii_lowercase[start:start + dim])
+    @staticmethod
+    def _compute_R():
+        """Compute R such that ∫φ²(x)dx = 1, where φ(x) = exp(1 - 1/(1-(x/R)²)) for |x| < R."""
+        # Integral of φ²(u) from -1 to 1, where u = x/R
+        def integrand(u):
+            return np.exp(2.0 - 2.0 / (1.0 - u**2))
+        
+        integral, _ = integrate.quad(integrand, -0.9999, 0.9999)
+        return 1.0 / integral

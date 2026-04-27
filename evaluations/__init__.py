@@ -55,7 +55,7 @@ def collect_predictions(test_dl, forward_fn, device):
     return torch.cat(reals), torch.cat(preds)
 
 
-def evaluate(x_real, x_pred, metrics):
+def evaluate(x_real, x_pred, metrics, batch_size=None):
     """Run selected metrics on a pair of tensors.
 
     Parameters
@@ -64,10 +64,15 @@ def evaluate(x_real, x_pred, metrics):
     x_pred : torch.Tensor
     metrics : list[Metric]
         Any subset of Metric instances to evaluate.
+    batch_size : int | None
+        If not None, split x_real and x_pred into batches of this size before
 
     Returns
     -------
     dict[str, torch.Tensor]
         {metric.name: scalar score} for each metric.
     """
-    return {m.name: m.measure(x_real, x_pred) for m in metrics}
+    if batch_size is not None:
+        return {m.name: m.measure(x_real[..., 1:].reshape(batch_size, -1), x_pred[..., 1:].reshape(batch_size, -1)) for m in metrics}
+    else:
+        return {m.name: m.measure(x_real, x_pred) for m in metrics}
