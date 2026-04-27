@@ -3,9 +3,11 @@ from torch import nn
 import numpy as np
 
 import warnings
+import iisignature 
 from scipy import linalg
 from sklearn.metrics.pairwise import polynomial_kernel
 from abc import ABC, abstractmethod
+
 
 from evaluations import statistics as stats
 
@@ -28,6 +30,7 @@ Metric List:
 - RMSEMetric
 - FVDMetric
 - KVDMetric
+- SigW1Metric
 '''
 
 
@@ -567,3 +570,99 @@ class KVDMetric(Metric):
             feat_real = self.model.extract_features(x_real).cpu().numpy()
             feat_pred = self.model.extract_features(x_pred).cpu().numpy()
         return self._polynomial_mmd_averages(feat_pred, feat_real)
+
+
+#-Signature based metric using wasserstein based metric: 
+class SigW1Metric(Metric):
+    """Signature Wasserstein-1 distance using iisignature.
+
+    Computes the truncated Sig-W1 distance between two path distributions
+    by comparing their expected signatures level by level.
+
+    Expects inputs of shape (B, T) or (B, T, D), where B is the batch
+    (sample) dimension and T is the time dimension.
+
+    Parameters
+    ----------
+    m : int
+        Signature truncation level.
+    time_augment : bool
+        If True, prepends a uniform time channel [0, 1] to each path
+        before computing signatures. Recommended for most uses.
+    """
+
+    def __init__(self, m=5, time_augment=True):
+        self.m = m
+        self.time_augment = time_augment
+
+    @property
+    def name(self):
+        return 'SigW1Metric'
+
+    @staticmethod
+    def _time_augment(X):
+        """Prepend a uniform time channel. X: (B, T, D) -> (B, T, D+1)."""
+        B, T, D = X.shape
+        t = np.linspace(0.0, 1.0, T).reshape(1, T, 1)
+        t = np.broadcast_to(t, (B, T, 1))
+        return np.concatenate([t, X], axis=2)
+
+    @staticmethod
+    def _split_levels(sig_flat, d, m):
+        """Split flat iisignature output into a list of per-level arrays.
+        
+        iisignature.sig returns a flat array of shape (B, siglength(d, m))
+        where the levels are concatenated as: d, d^2, ..., d^m.
+        """
+        levels = []
+        idx = 0
+        for k in range(1, m + 1):
+            size = d ** k
+            levels.append(sig_flat[:, idx:idx + size])
+            idx += size
+        return levels
+
+    @staticmethod
+    def _expected_signature(X, m):
+        """Compute the mean signature across the batch, per level.
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (B, T, D)
+        m : int
+
+        Returns
+        -------
+        list of m arrays, one per level, each averaged over the batch
+        """
+        d = X.shape[2]
+        # iisignature.sig handles the full batch natively: (B, T, D) -> (B, siglength(d, m))
+        sigs = iisignature.sig(X.astype(np.float32), m)
+        levels = SigW1Metric._split_levels(sigs, d, m)
+        return [lvl.mean(axis=0) for lvl in levels]
+
+    @staticmethod
+    def _sig_w1(exp_sig_real, exp_sig_pred):
+        """Sum of L1 norms of level-wise differences."""
+        return sum(
+            np.sum(np.abs(r-p))
+            for r, p in zip(exp_sig_real, exp_sig_pred)
+        )
+
+    def measure(self, x_real, x_pred):
+        real = x_real.detach().cpu().numpy()
+        pred = x_pred.detach().cpu().numpy()
+
+        if real.ndim == 2:          # (B, T) -> (B, T, 1)
+            real = real[:, :, None]
+            pred = pred[:, :, None]
+
+        if self.time_augment:
+            real = self._time_augment(real)
+            pred = self._time_augment(pred)
+
+        exp_sig_real = self._expected_signature(real, self.m)
+        exp_sig_pred = self._expected_signature(pred, self.m)
+
+        return torch.tensor(self._sig_w1(exp_sig_real, exp_sig_pred))
+
