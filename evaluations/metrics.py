@@ -574,21 +574,14 @@ class KVDMetric(Metric):
 
 #-Signature based metric using wasserstein based metric: 
 class SigW1Metric(Metric):
-    """Signature Wasserstein-1 distance using iisignature.
+    """
+    Signature Wasserstein-1 distance using signatory.
 
     Computes the truncated Sig-W1 distance between two path distributions
     by comparing their expected signatures level by level.
 
     Expects inputs of shape (B, T) or (B, T, D), where B is the batch
     (sample) dimension and T is the time dimension.
-
-    Parameters
-    ----------
-    m : int
-        Signature truncation level.
-    time_augment : bool
-        If True, prepends a uniform time channel [0, 1] to each path
-        before computing signatures. Recommended for most uses.
     """
 
     def __init__(self, m=5, time_augment=True):
@@ -601,18 +594,22 @@ class SigW1Metric(Metric):
 
     @staticmethod
     def _time_augment(X):
-        """Prepend a uniform time channel. X: (B, T, D) -> (B, T, D+1)."""
+        """
+        Prepend a uniform time channel.
+        X: torch.Tensor of shape (B, T, D) -> (B, T, D+1)
+        """
         B, T, D = X.shape
-        t = np.linspace(0.0, 1.0, T).reshape(1, T, 1)
-        t = np.broadcast_to(t, (B, T, 1))
-        return np.concatenate([t, X], axis=2)
+        t = torch.linspace(0.0, 1.0, T, device=X.device)
+        t = t.view(1, T, 1).expand(B, T, 1)
+        return torch.cat([t, X], dim=2)
 
     @staticmethod
     def _split_levels(sig_flat, d, m):
-        """Split flat iisignature output into a list of per-level arrays.
-        
-        iisignature.sig returns a flat array of shape (B, siglength(d, m))
-        where the levels are concatenated as: d, d^2, ..., d^m.
+        """
+        Split flat signature into per-level tensors.
+
+        signatory.signature returns a flat tensor of shape
+        (B, sum_{k=1}^m d^k)
         """
         levels = []
         idx = 0
@@ -624,58 +621,66 @@ class SigW1Metric(Metric):
 
     @staticmethod
     def _expected_signature(X, m):
-        """Compute the mean signature across the batch, per level.
+        """
+        Compute expected signature (mean over batch), per level.
 
         Parameters
         ----------
-        X : np.ndarray, shape (B, T, D)
+        X : torch.Tensor, shape (B, T, D)
         m : int
 
         Returns
         -------
-        list of m arrays, one per level, each averaged over the batch
+        list of torch.Tensor
+            One tensor per level, averaged over batch
         """
         d = X.shape[2]
-        # iisignature.sig handles the full batch natively: (B, T, D) -> (B, siglength(d, m))
-        sigs = iisignature.sig(X.astype(np.float32), m)
+
+        # Compute signature: (B, sigdim)
+        
+        sigs = iisignature.sig(
+            X.detach().cpu().numpy().astype("float32"), m
+        )
+        sigs = torch.from_numpy(sigs).to(X.device)
+
+
         levels = SigW1Metric._split_levels(sigs, d, m)
-        return [lvl.mean(axis=0) for lvl in levels]
+        return [lvl.mean(dim=0) for lvl in levels]
 
     @staticmethod
     def _sig_w1(exp_sig_real, exp_sig_pred):
-        """Sum of L1 norms of level-wise differences."""
+        """
+        Sum of L1 norms of level-wise differences.
+        """
         return sum(
-            np.sum(np.abs(r-p))
+            torch.sum(torch.abs(r - p))
             for r, p in zip(exp_sig_real, exp_sig_pred)
         )
 
-    
-def measure(self, x_real, x_pred):
-    real = x_real.detach().cpu().numpy()
-    pred = x_pred.detach().cpu().numpy()
+    def measure(self, x_real, x_pred):
+        real = x_real
+        pred = x_pred
 
-    # (B, Nx, T) -> (B, Nx, T, 1)
-    if real.ndim == 3:
-        real = real[..., None]
-        pred = pred[..., None]
+        # (B, Nx, T) -> (B, Nx, T, 1)
+        if real.dim() == 3:
+            real = real.unsqueeze(-1)
+            pred = pred.unsqueeze(-1)
 
-    B, Nx, T, D = real.shape
-    spatial_loss = 0.0
+        B, Nx, T, D = real.shape
+        spatial_loss = 0.0
 
-    # deterministic spatial average
-    for i in range(Nx):
-        real_x = real[:, i, :, :]   # (B, T, D)
-        pred_x = pred[:, i, :, :]
+        for i in range(Nx):
+            real_x = real[:, i, :, :]   # (B, T, D)
+            pred_x = pred[:, i, :, :]
 
-        if self.time_augment:
-            real_x = self._time_augment(real_x)
-            pred_x = self._time_augment(pred_x)
+            if self.time_augment:
+                real_x = self._time_augment(real_x)
+                pred_x = self._time_augment(pred_x)
 
-        exp_sig_real = self._expected_signature(real_x, self.m)
-        exp_sig_pred = self._expected_signature(pred_x, self.m)
+            exp_sig_real = self._expected_signature(real_x, self.m)
+            exp_sig_pred = self._expected_signature(pred_x, self.m)
 
-        spatial_loss += self._sig_l1(exp_sig_real, exp_sig_pred)
+            spatial_loss += self._sig_w1(exp_sig_real, exp_sig_pred)
 
-    spatial_loss /= Nx
-    return torch.tensor(spatial_loss)
-
+        spatial_loss /= Nx
+        return spatial_loss
