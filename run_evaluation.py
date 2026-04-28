@@ -76,8 +76,8 @@ METRIC_REGISTRY = {
     'HsLoss':    (lambda: HsLossMetric(),                        'Sobolev H1 loss'),
     'RMSE':      (lambda: RMSEMetric(),                          'Root mean squared error'),
     'Cov':       (lambda: CovarianceMetric(),                    'Covariance difference'),
-    'ACF':       (lambda: AutoCorrelationMetric(max_lag=64),     'ACF difference (lag=64)'),
-    'CrossCorr': (lambda: CrossCorrelationMetric(lags=64),       'Cross-correlation difference'),
+    'ACF':       (lambda: AutoCorrelationMetric(),     'ACF difference (lag=64)'),
+    'CrossCorr': (lambda: CrossCorrelationMetric(),       'Cross-correlation difference'),
     'MAD':       (lambda: MeanAbsDiffMetric(),                   'Mean absolute difference'),
     'VaR':       (lambda: VARMetric(alpha=0.05),                 'Value-at-Risk (alpha=0.05)'),
     'ES':        (lambda: ESMetric(alpha=0.05),                  'Expected Shortfall (alpha=0.05)'),
@@ -136,6 +136,7 @@ def main():
                         help='List all available metrics and exit')
     args = parser.parse_args()
 
+
     if args.list_metrics:
         list_metrics()
         return
@@ -156,13 +157,53 @@ def main():
     for short_name, m in zip(args.metrics, metrics):
         name_map[m.name] = short_name
 
-    # Evaluate each file
+    # Evaluate each file (per-batch; LpLoss/LpLossAbs/HsLoss handled specially)
     results = {}
     for filepath in args.files:
         u_real, u_pred = load_predictions(filepath)
-        scores = evaluate(u_real, u_pred, metrics)
-        # Remap keys to short names for display
-        results[filepath] = {name_map[k]: v for k, v in scores.items()}
+        n_test = int(u_real.shape[0])
+        print(f"Evaluating {filepath} on {n_test} test samples...")
+        batch_size = 20
+
+        # collect per-batch scores for each metric
+        metric_scores = {m.name: [] for m in metrics}
+        num_batches = (n_test + batch_size - 1) // batch_size
+
+        for bi in range(num_batches):
+            s = bi * batch_size
+            e = min(s + batch_size, n_test)
+            xr = u_real[s:e]
+            xp = u_pred[s:e]
+            bsz = int(xr.shape[0])
+
+            for m in metrics:
+                # LpLoss (abs or rel) -> same reshape as training
+                if isinstance(m, LpLossMetric):
+                    xr_flat = xr[..., 1:].reshape(bsz, -1)
+                    xp_flat = xp[..., 1:].reshape(bsz, -1)
+                    val = m.measure(xr_flat, xp_flat)
+
+                # HsLoss -> use the same slice, then ensure shape (B, Nx, Ny, T)
+                elif isinstance(m, HsLossMetric):
+                    xr_slice = xr[..., 1:]
+                    xp_slice = xp[..., 1:]
+                    xr2 = xr_slice.squeeze(1) if xr_slice.ndim == 4 else xr_slice
+                    xp2 = xp_slice.squeeze(1) if xp_slice.ndim == 4 else xp_slice
+                    xr_hs = xr2.unsqueeze(2) if xr2.ndim == 3 else xr2
+                    xp_hs = xp2.unsqueeze(2) if xp2.ndim == 3 else xp2
+                    val = m.measure(xr_hs, xp_hs)
+
+                # other metrics: pass batches (remove channel dim if present)
+                else:
+                    xr_for = xr
+                    xp_for = xp.squeeze(1) if (xp.ndim == 4 and xp.shape[1] == 1) else xp
+                    val = m.measure(xr_for, xp_for)
+
+                metric_scores[m.name].append(float(val.item()) if isinstance(val, torch.Tensor) else float(val))
+
+        # average per-metric across batches and remap keys
+        avg_scores = {mname: torch.tensor(sum(vals) / len(vals)) for mname, vals in metric_scores.items()}
+        results[filepath] = {name_map[k]: v for k, v in avg_scores.items()}
 
     # Print table
     format_table(results, args.metrics)

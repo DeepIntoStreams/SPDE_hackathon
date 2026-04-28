@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import string
 from typing import Callable, Literal
 
 import numpy as np
+from scipy import integrate
 from tqdm import tqdm
 
 Basis1D = Callable[[np.ndarray, int, float], np.ndarray]
@@ -16,7 +19,7 @@ def _sin_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
 
 
 def _sincos_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
-    """Periodic (real Fourier): [1, cos_1, sin_1, cos_2, sin_2, ...] truncated to N modes."""
+    """Periodic (real Fourier): [1, cos_1, sin_1, cos_2, ...] truncated to N modes."""
     shifted = grid - grid[0]
     basis = np.empty((n_modes, grid.size))
     for k in range(n_modes):
@@ -30,7 +33,7 @@ def _sincos_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
 
 
 def _fourier_basis(grid: np.ndarray, n_modes: int, length: float) -> np.ndarray:
-    """Periodic (complex Fourier): (1/sqrt(L)) exp(i 2 pi n (x-x0) / L), n centred on 0."""
+    """Periodic (complex Fourier): (1/sqrt(L)) exp(i 2 pi n (x-x0) / L), n centered on 0."""
     shifted = grid - grid[0]
     start = -(n_modes // 2)
     n = np.arange(start, start + n_modes, dtype=float)
@@ -65,6 +68,7 @@ class NoiseND:
         self.covariance = covariance
         self._basis_1d = _BASIS_FNS[basis]
         self._q_spectrum = q_spectrum
+        self._R = self._compute_R()
 
     @staticmethod
     def partition_axis(a: float, b: float, step: float) -> np.ndarray:
@@ -91,6 +95,51 @@ class NoiseND:
 
         return np.stack([sample() for _ in tqdm(range(num))])
 
+    def WN_space_time_KPZ(self, s, t, dt, bounds, steps, truncation, num=None):
+        grids = self.partition_nd(bounds, steps)
+        mode_shape = self._normalize_truncation(truncation, len(grids))
+        lengths = tuple(float(step) * (g.size - 1) for g, step in zip(grids, steps))
+        basis = self._spatial_basis(grids, mode_shape, lengths)
+        total_modes = int(np.prod(mode_shape))
+        eps_truncation = truncation if np.isscalar(truncation) else truncation[0]
+        epsilon = 1.0 / eps_truncation
+
+        mollifier_scales = self._mollifier_scales(total_modes, epsilon)
+        basis = basis * mollifier_scales.reshape((-1,) + (1,) * len(grids))
+
+        if num is None:
+            bm = self._brownian(s, t, dt, total_modes)
+            return np.einsum("tm,m...->t...", bm, basis, optimize=True)
+
+        return np.stack(
+            [
+                np.einsum(
+                    "tm,m...->t...",
+                    self._brownian(s, t, dt, total_modes),
+                    basis,
+                    optimize=True,
+                )
+                for _ in tqdm(range(num))
+            ]
+        )
+
+    def _phi_mollifier(self, x: float) -> float:
+        abs_x = abs(x)
+        if abs_x >= self._R:
+            return 0.0
+        ratio = abs_x / self._R
+        return float(np.exp(1.0 - 1.0 / (1.0 - ratio**2)))
+
+    def _mollifier_scales(self, total_modes, epsilon):
+        if self.basis == "sincos":
+            scales = np.empty(total_modes, dtype=float)
+            for i in range(total_modes):
+                j = 0 if i == 0 else (i + 1) // 2
+                scales[i] = self._phi_mollifier(j * epsilon)
+            return scales
+
+        return np.array([self._phi_mollifier((i + 1) * epsilon) for i in range(total_modes)])
+
     def initial(self, num, grids, truncation=10, decay=2):
         grids = tuple(np.asarray(g, dtype=float) for g in grids)
         mode_shape = self._normalize_truncation(truncation, len(grids))
@@ -104,6 +153,7 @@ class NoiseND:
             idx = np.indices(mode_shape).reshape(len(mode_shape), -1) + 1
             weights = 1.0 / (1.0 + np.sum(idx.astype(float) ** decay, axis=0))
             coeffs = np.random.normal(size=(num, total_modes)) * weights
+
         init = np.einsum("nm,m...->n...", coeffs, basis, optimize=True)
         return init.real if self.basis == "fourier" else init
 
@@ -113,6 +163,7 @@ class NoiseND:
                 raise ValueError("fourier truncation must be odd in every dimension")
             if any(n > g.size - 1 for n, g in zip(mode_shape, grids)):
                 raise ValueError("fourier truncation must not exceed unique periodic grid points")
+
         factors = [
             self._basis_1d(np.asarray(g, dtype=float), n, L)
             for g, n, L in zip(grids, mode_shape, lengths)
@@ -184,3 +235,11 @@ class NoiseND:
         if len(values) != dim or any(v < 1 for v in values):
             raise ValueError("truncation must be a positive int or tuple of positive ints, one per spatial dimension")
         return values
+
+    @staticmethod
+    def _compute_R():
+        def integrand(u):
+            return np.exp(2.0 - 2.0 / (1.0 - u**2))
+
+        integral, _ = integrate.quad(integrand, -0.9999, 0.9999)
+        return 1.0 / integral

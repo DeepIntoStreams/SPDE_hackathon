@@ -155,7 +155,7 @@ class SPDE2D():
         return Solution.astype('float32')
     
     
-    # Solve the equation \partial_t X_{\epsilon} - \Delta X_{\epsilon} = \xi_{\epsilon} with initial condition X_{\epsilon}(0,x,y) = v(0) = 0
+    # Solve the equation \partial_t X_{\epsilon} - \Delta X_{\epsilon} = \sigma * \xi_{\epsilon} with initial condition X_{\epsilon}(0,x,y) = v(0) = 0
     def FT_solver(self, W, T, X, Y, dW, dt):
         # u0 - initial condition
         # W - space time noise
@@ -194,13 +194,62 @@ class SPDE2D():
         return Solution
     
 
-    # Computing the expectation of X_{\epsilon}^2 by Monte Carlo
-    def MC(self, X_eps):
+    # # Computing the expectation of X_{\epsilon}^2 by Monte Carlo
+    # def MC(self, X_eps):
 
-        num = X_eps.shape[0]
-        T = X_eps.shape[1]
-        a_eps = np.array([np.sum(X_eps[:, t, :, :] ** 2, axis=0) / num for t in range(T)])
-        print(np.max(np.abs(a_eps)))
+    #     num = X_eps.shape[0]
+    #     T = X_eps.shape[1]
+    #     a_eps = np.array([np.sum(X_eps[:, t, :, :] ** 2, axis=0) / num for t in range(T)])
+
+    #     return a_eps
+    
+    def Renormalize_Constant(self, X_eps, T=None, X=None, Y=None, Kx_max=None, Ky_max=None):
+        Nx = X_eps.shape[2]
+        Ny = X_eps.shape[3]
+        Nt = X_eps.shape[1]
+
+        # Wavenumber grids (non-negative integers only)
+        kx_vals = np.arange(0, Kx_max + 1)
+        ky_vals = np.arange(0, Ky_max + 1)
+        kx_grid, ky_grid = np.meshgrid(kx_vals, ky_vals, indexing='ij')
+        k_sq = kx_grid**2 + ky_grid**2
+
+        # Compute sigma_{kx,ky}^2 for all times
+        with np.errstate(divide='ignore', invalid='ignore'):
+            k_sq_exp = k_sq[..., np.newaxis]
+            T_exp = T[np.newaxis, np.newaxis, :]
+            term = np.where(
+                k_sq_exp == 0,
+                self.sigma ** 2 * T_exp,
+                self.sigma ** 2 / (2.0 * k_sq_exp * 4 * np.pi ** 2) * (1.0 - np.exp(-2.0 * k_sq_exp * 4 * np.pi ** 2 * T_exp))
+            )
+
+        # # New computation with lambda_k = 4*N_x^2*sin^2(pi*k_x/N_x) + 4*N_y^2*sin^2(pi*k_y/N_y)
+        # lambda_k = 4.0 * Kx_max**2 * np.sin(np.pi * kx_grid / Kx_max)**2 + 4.0 * Ky_max**2 * np.sin(np.pi * ky_grid / Ky_max)**2
+
+        # with np.errstate(divide='ignore', invalid='ignore'):
+        #     lambda_k_exp = lambda_k[..., np.newaxis]
+        #     T_exp = T[np.newaxis, np.newaxis, :]
+        #     term_new = np.where(
+        #         lambda_k_exp == 0,
+        #         self.sigma ** 2 * T_exp,
+        #         self.sigma ** 2 / (2.0 * lambda_k_exp) * (1.0 - np.exp(-2.0 * lambda_k_exp * T_exp))
+        #     )
+
+        # multiplicities: (0,0)=1, (kx>0,ky=0)=2, (kx=0,ky>0)=2, (kx>0,ky>0)=4
+        W = np.ones_like(kx_grid, dtype=float)
+        if Kx_max >= 1 and Ky_max >= 1:
+            W[1:, 1:] = 4.0
+        if Ky_max >= 1:
+            W[0, 1:] = 2.0
+        if Kx_max >= 1:
+            W[1:, 0] = 2.0
+
+        # term has shape (Kx+1, Ky+1, Nt); weighted sum over kx,ky -> (Nt,)
+        S = (W[..., None] * term).sum(axis=(0, 1))
+
+        # Broadcast to (Nt, Nx, Ny)
+        a_eps = S[:, None, None] * np.ones((Nt, Nx, Ny))
 
         return a_eps
     
@@ -209,8 +258,8 @@ class SPDE2D():
     # dv = \Delta v * dt -:u^3: dt + 3*v dt with v(0) = 0, where :u^3: = v^3 + 3*v^2*X_{\epsilon} + 3*v*:X_{\epsilon}^2: + :X_{\epsilon}^3:
     # :X_{\epsilon}^2: = X_{\epsilon}^2 - a_{\epsilon}
     # :X_{\epsilon}^3: = X_{\epsilon}^3 - 3*X_{\epsilon}*a_{\epsilon}
-    def Renormalization(self, W, T=None, X=None, Y=None, diff=True):
-
+    def Renormalization(self, W, T=None, X=None, Y=None, diff=True, trcation=None):
+        
         # Extract specae-time increments and dW
         dW, dx, dy, dt = self.initialization(W, T, X, Y, diff)
 
@@ -218,7 +267,7 @@ class SPDE2D():
         X_eps = self.FT_solver(W, T, X, Y, dW, dt)
 
         # a_{\epsilon}
-        a_eps = self.MC(X_eps)
+        a_eps= self.Renormalize_Constant(X_eps, T, X, Y, Kx_max=trcation, Ky_max=trcation)  
 
         # :X_{\epsilon}^2:
         Xsquare = np.zeros(shape=W.shape)
