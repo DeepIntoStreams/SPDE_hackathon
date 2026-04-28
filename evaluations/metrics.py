@@ -649,20 +649,33 @@ class SigW1Metric(Metric):
             for r, p in zip(exp_sig_real, exp_sig_pred)
         )
 
-    def measure(self, x_real, x_pred):
-        real = x_real.detach().cpu().numpy()
-        pred = x_pred.detach().cpu().numpy()
+    
+def measure(self, x_real, x_pred):
+    real = x_real.detach().cpu().numpy()
+    pred = x_pred.detach().cpu().numpy()
 
-        if real.ndim == 2:          # (B, T) -> (B, T, 1)
-            real = real[:, :, None]
-            pred = pred[:, :, None]
+    # (B, Nx, T) -> (B, Nx, T, 1)
+    if real.ndim == 3:
+        real = real[..., None]
+        pred = pred[..., None]
+
+    B, Nx, T, D = real.shape
+    spatial_loss = 0.0
+
+    # deterministic spatial average
+    for i in range(Nx):
+        real_x = real[:, i, :, :]   # (B, T, D)
+        pred_x = pred[:, i, :, :]
 
         if self.time_augment:
-            real = self._time_augment(real)
-            pred = self._time_augment(pred)
+            real_x = self._time_augment(real_x)
+            pred_x = self._time_augment(pred_x)
 
-        exp_sig_real = self._expected_signature(real, self.m)
-        exp_sig_pred = self._expected_signature(pred, self.m)
+        exp_sig_real = self._expected_signature(real_x, self.m)
+        exp_sig_pred = self._expected_signature(pred_x, self.m)
 
-        return torch.tensor(self._sig_w1(exp_sig_real, exp_sig_pred))
+        spatial_loss += self._sig_l1(exp_sig_real, exp_sig_pred)
+
+    spatial_loss /= Nx
+    return torch.tensor(spatial_loss)
 
