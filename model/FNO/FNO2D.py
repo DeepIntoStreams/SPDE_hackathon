@@ -221,21 +221,22 @@ def dataloader_fno_2d_u0(u, ntrain=1000, ntest=200, T=51, sub_t=1, sub_x=4, batc
 def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20, epochs=5000,
                        learning_rate=0.001, scheduler_step=100, scheduler_gamma=0.5, print_every=20,
                        plateau_patience=None, plateau_terminate=None, delta=0,
-                       checkpoint_file='checkpoint.pt'):
+                       checkpoint_file=None, report_loader=None, report_name='Test',
+                       metric_eval_fn=None, metric_eval_every=None, epoch_log_fn=None):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
     if plateau_patience is None:
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     else:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=plateau_patience, threshold=1e-6, min_lr=1e-7)
-    if plateau_terminate is not None:
-        early_stopping = EarlyStopping(patience=plateau_terminate, verbose=False, delta=delta, path=checkpoint_file)
 
     ntrain = len(train_loader.dataset)
     ntest = len(test_loader.dataset)
 
     losses_train = []
     losses_test = []
+    best_val_loss = float('inf')
+    epochs_without_improvement = 0
 
     try:
 
@@ -252,7 +253,8 @@ def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20
 
                 u_pred = model(xi_)
                 u_pred = u_pred[..., 0]
-                loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
+                current_batch = u_.shape[0]
+                loss = myloss(u_pred[..., 1:].reshape(current_batch, -1), u_[..., 1:].reshape(current_batch, -1))
 
                 train_loss += loss.item()
                 loss.backward()
@@ -268,24 +270,68 @@ def train_fno_2d(model, train_loader, test_loader, device, myloss, batch_size=20
 
                     u_pred = model(xi_)
                     u_pred = u_pred[..., 0]
-                    loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
+                    current_batch = u_.shape[0]
+                    loss = myloss(u_pred[..., 1:].reshape(current_batch, -1), u_[..., 1:].reshape(current_batch, -1))
 
                     test_loss += loss.item()
+
+            report_loss = None
+            if report_loader is not None:
+                report_count = len(report_loader.dataset)
+                report_total = 0.
+                with torch.no_grad():
+                    for xi_, u_ in report_loader:
+                        xi_ = xi_.to(device)
+                        u_ = u_.to(device)
+                        u_pred = model(xi_)
+                        u_pred = u_pred[..., 0]
+                        current_batch = u_.shape[0]
+                        loss = myloss(u_pred[..., 1:].reshape(current_batch, -1), u_[..., 1:].reshape(current_batch, -1))
+                        report_total += loss.item()
+                report_loss = report_total / report_count
 
             if plateau_patience is None:
                 scheduler.step()
             else:
                 scheduler.step(test_loss / ntest)
-            if plateau_terminate is not None:
-                early_stopping(test_loss / ntest, model)
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break
+            val_metric = test_loss / ntest
 
-            if ep % print_every == 0:
+            should_stop = False
+            improved = val_metric < (best_val_loss - delta)
+            if improved:
+                best_val_loss = val_metric
+                epochs_without_improvement = 0
+                if checkpoint_file is not None:
+                    torch.save({
+                        "model_state_dict": model.state_dict(),
+                        "epoch": ep,
+                        "best_val_loss": best_val_loss,
+                    }, checkpoint_file)
+            elif plateau_terminate is not None and plateau_terminate > 0:
+                epochs_without_improvement += 1
+                should_stop = epochs_without_improvement >= plateau_terminate
+
+            if metric_eval_fn is not None and metric_eval_every is not None and ep % metric_eval_every == 0:
+                metric_eval_fn(ep, model)
+
+            if ep % print_every == 0 or ep == epochs - 1 or should_stop:
                 losses_train.append(train_loss / ntrain)
-                losses_test.append(test_loss / ntest)
-                print('Epoch {:04d} | Total Train Loss {:.6f} | Total Val Loss {:.6f}'.format(ep, train_loss / ntrain, test_loss / ntest))
+                losses_test.append(val_metric)
+                train_metric = train_loss / ntrain
+                msg = 'Epoch {:04d} | Total Train Loss {:.6f} | Total Val Loss {:.6f}'.format(
+                    ep, train_metric, val_metric
+                )
+                if report_loss is not None:
+                    msg += ' | Total {} Loss {:.6f}'.format(report_name, report_loss)
+                print(msg)
+                if epoch_log_fn is not None:
+                    epoch_log_fn(ep, train_metric, val_metric, report_loss)
+
+            if should_stop:
+                print('Early stopping at epoch {:04d} | best Val Loss {:.6f} | patience {}'.format(
+                    ep, best_val_loss, plateau_terminate
+                ))
+                break
 
         return model, losses_train, losses_test
 
@@ -304,6 +350,7 @@ def eval_fno_2d(model, test_dl, myloss, batch_size, device):
             xi_, u_ = xi_.to(device), u_.to(device)
             u_pred = model(xi_)
             u_pred = u_pred[..., 0]
-            loss = myloss(u_pred[..., 1:].reshape(batch_size, -1), u_[..., 1:].reshape(batch_size, -1))
+            current_batch = u_.shape[0]
+            loss = myloss(u_pred[..., 1:].reshape(current_batch, -1), u_[..., 1:].reshape(current_batch, -1))
             test_loss += loss.item()
     return test_loss / ntest

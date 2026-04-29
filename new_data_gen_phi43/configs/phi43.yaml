@@ -1,0 +1,15 @@
+sim:
+  N: 8  # spatial cutoff, grid size is M = 2 * N + 1
+  dt: 1.384e-4  # approximately 0.01 * eps^2 for N = 8
+  steps: 256
+  num: 16  # number of simulated paths
+  fix_u0: True  # [True, False] True--fix zero IC; False--vary IC across samples
+  num_tau: 48
+  tau_max_multiplier: 12.0
+  include_c12: True
+
+seed: 42
+
+save_dir: "../results/Phi43/"
+save_name: "Phi43"
+save_single_path_tcxyz: False

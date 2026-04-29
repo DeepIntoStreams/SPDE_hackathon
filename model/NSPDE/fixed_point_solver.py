@@ -23,6 +23,14 @@ def compl_mul3d(func_fft, kernel_tensor):
 def compl_mul2d_time(func_fft, kernel_tensor):
     return torch.einsum("bixyt, ijxyt -> bjxyt", func_fft, kernel_tensor)
 
+
+def compl_mul4d(func_fft, kernel_tensor):
+    return torch.einsum("bixyzt, ijxyzt -> bjxyzt", func_fft, kernel_tensor)
+
+
+def compl_mul3d_time(func_fft, kernel_tensor):
+    return torch.einsum("bixyzt, ijxyzt -> bjxyzt", func_fft, kernel_tensor)
+
 #=============================================================================================
 # Implementation of the inverse discrete Fourier transform to create the computational graph
 # (x,t) -> z(x,t) 
@@ -87,7 +95,7 @@ def inverseDFTn(u_ft, grid, dim, s=None):
 # Semigroup action is integration against a kernel
 #=============================================================================================
 class KernelConvolution(nn.Module):
-    def __init__(self, channels, modes1, modes2, modes3=None):
+    def __init__(self, channels, modes1, modes2, modes3=None, modes4=None):
         super(KernelConvolution, self).__init__()
 
         """ This module has a kernel parametrized as a complex tensor in the spectral domain. 
@@ -102,10 +110,14 @@ class KernelConvolution(nn.Module):
             self.modes = [modes1, modes2]
             self.dims = [2,3]
             self.weights = nn.Parameter(self.scale * torch.rand(channels, channels, modes1, modes2,  dtype=torch.cfloat)) # K_theta in paper
-        else: # 2d
+        elif not modes4: # 2d
             self.modes = [modes1, modes2, modes3]
             self.dims = [2,3,4]
             self.weights = nn.Parameter(self.scale * torch.rand(channels, channels, modes1, modes2, modes3, dtype=torch.cfloat)) # K_theta in paper
+        else: # 3d
+            self.modes = [modes1, modes2, modes3, modes4]
+            self.dims = [2,3,4,5]
+            self.weights = nn.Parameter(self.scale * torch.rand(channels, channels, modes1, modes2, modes3, modes4, dtype=torch.cfloat)) # K_theta in paper
        
    
     def forward(self, z, grid=None, init=False):
@@ -125,8 +137,10 @@ class KernelConvolution(nn.Module):
             out_ft = torch.zeros(z.size(), device=z.device, dtype=torch.cfloat)
             if len(self.modes)==2: # 1d case
                 out_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1] ] = compl_mul2d(z_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1] ], self.weights)
-            else: # 2d case
+            elif len(self.modes)==3: # 2d case
                 out_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1] ] = compl_mul3d(z_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1] ], self.weights)
+            else: # 3d case
+                out_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1], freqs[3][0]:freqs[3][1] ] = compl_mul4d(z_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1], freqs[3][0]:freqs[3][1] ], self.weights)
             
             # Compute Inverse FFT  
             out_ft = torch.fft.ifftshift(out_ft, dim=self.dims) 
@@ -150,8 +164,10 @@ class KernelConvolution(nn.Module):
             gridx, gridt = grid[...,0,:-1], grid[...,-1].unsqueeze(-1)
             if len(self.modes)==2:
                 gridt = gridt[0]
-            else:
+            elif len(self.modes)==3:
                 gridt = gridt[0,0]
+            else:
+                gridt = gridt[0,0,0]
 
         # lower and upper bounds of selected frequencies
         freqs = [ (z0_path.size(2+i)//2 - self.modes[i]//2, z0_path.size(2+i)//2 + self.modes[i]//2) for i in range(len(self.modes)-1) ]
@@ -170,8 +186,10 @@ class KernelConvolution(nn.Module):
         out_ft = torch.zeros(z0_path.size(), device=z0_path.device, dtype=torch.cfloat)
         if len(self.modes)==2: # 1d case
             out_ft[:, :, freqs[0][0]:freqs[0][1], : ] = compl_mul1d_time(z_ft[:, :, freqs[0][0]:freqs[0][1] ], weights)
-        else: # 2d case
+        elif len(self.modes)==3: # 2d case
             out_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], : ] = compl_mul2d_time(z_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1] ], weights)
+        else: # 3d case
+            out_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1], : ] = compl_mul3d_time(z_ft[:, :, freqs[0][0]:freqs[0][1], freqs[1][0]:freqs[1][1], freqs[2][0]:freqs[2][1] ], weights)
 
 
         # Compute Inverse FFT   
@@ -189,7 +207,7 @@ class KernelConvolution(nn.Module):
 #=============================================================================================
 
 class NeuralFixedPoint(nn.Module):
-    def __init__(self, spde_func, n_iter, modes1, modes2, modes3=None):
+    def __init__(self, spde_func, n_iter, modes1, modes2, modes3=None, modes4=None):
         super(NeuralFixedPoint, self).__init__()
 
         # self.padding = int(2**(np.ceil(np.log2(abs(2*T-1)))))
@@ -201,7 +219,7 @@ class NeuralFixedPoint(nn.Module):
         self.spde_func = spde_func
         
         # semigroup
-        self.convolution = KernelConvolution(spde_func.hidden_channels, modes1, modes2, modes3) 
+        self.convolution = KernelConvolution(spde_func.hidden_channels, modes1, modes2, modes3, modes4) 
 
 
     def forward(self, z0, xi, grid=None):
@@ -210,15 +228,17 @@ class NeuralFixedPoint(nn.Module):
             - grid: (dim_x, (possibly dim_y), dim_t)
         """
         
-        # if True 1d, else 2d
-        assert len(xi.size()) in [4,5], '1d and 2d cases only are implemented '
+        # if True 1d, else 2d or 3d
+        assert len(xi.size()) in [4,5,6], '1d, 2d, and 3d cases only are implemented '
         dim_flag = len(xi.size())==4
 
         # constant path
         if dim_flag:
             z0_path = z0.unsqueeze(-1).repeat(1, 1, 1, xi.size(-1)) 
-        else:
+        elif len(xi.size()) == 5:
             z0_path = z0.unsqueeze(-1).repeat(1, 1, 1, 1, xi.size(-1)) 
+        else:
+            z0_path = z0.unsqueeze(-1).repeat(1, 1, 1, 1, 1, xi.size(-1))
 
         # S_t * z_0
         z0_path =  self.convolution(z0_path, grid=grid, init=True) 
@@ -233,8 +253,10 @@ class NeuralFixedPoint(nn.Module):
 
             if dim_flag:
                 G_z_xi = torch.einsum('abcde, acde -> abde', G_z, xi)
-            else:
+            elif len(xi.size()) == 5:
                 G_z_xi = torch.einsum('abcdef, acdef -> abdef', G_z, xi)
+            else:
+                G_z_xi = torch.einsum('abcdefg, acdefg -> abdefg', G_z, xi)
 
             H_z_xi = F_z + G_z_xi
 

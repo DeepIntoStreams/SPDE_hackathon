@@ -3,9 +3,14 @@ from torch import nn
 import numpy as np
 
 import warnings
+try:
+    import iisignature  # type: ignore[import-not-found]
+except ImportError:
+    iisignature = None
 from scipy import linalg
 from sklearn.metrics.pairwise import polynomial_kernel
 from abc import ABC, abstractmethod
+
 
 from evaluations import statistics as stats
 
@@ -28,6 +33,7 @@ Metric List:
 - RMSEMetric
 - FVDMetric
 - KVDMetric
+- SigW1Metric
 '''
 
 
@@ -60,15 +66,16 @@ class CovarianceMetric(Metric):
         cov_real = stats.cov_torch(self.transform(x_real))
         cov_pred = stats.cov_torch(self.transform(x_pred))
         return torch.abs(cov_pred - cov_real.to(cov_pred.device)).mean()
-    
+
 
 class AutoCorrelationMetric(Metric):
-    """Mean absolute difference between autocorrelation/correlation matrices."""
+    """RMSE between autocorrelation functions."""
 
-    def __init__(self, transform=lambda x: x, stationary=False, max_lag=64, dim=(0, 1), symmetric=True):
+    def __init__(self, max_lag=64, stationary=True, dim=(0, 1),
+                 symmetric=False, transform=lambda x: x):
         self.transform = transform
-        self.stationary = stationary
         self.max_lag = max_lag
+        self.stationary = stationary
         self.dim = dim
         self.symmetric = symmetric
 
@@ -77,30 +84,21 @@ class AutoCorrelationMetric(Metric):
         return 'AcfMetric'
 
     def measure(self, x_real, x_pred):
-        x_real_t = self.transform(x_real)
-        x_pred_t = self.transform(x_pred)
-
+        t = self.transform
         if self.stationary:
-            acf_real = stats.acf_torch(x_real_t, max_lag=self.max_lag, dim=self.dim)  
-            acf_pred = stats.acf_torch(x_pred_t, max_lag=self.max_lag, dim=self.dim)
-            return torch.abs(acf_pred - acf_real).mean()
+            acf_real = stats.acf_torch(t(x_real), max_lag=self.max_lag, dim=self.dim)
+            acf_pred = stats.acf_torch(t(x_pred), max_lag=self.max_lag, dim=self.dim)
         else:
-            corr_real = stats.non_stationary_acf_torch(x_real_t, self.symmetric)  
-            corr_pred = stats.non_stationary_acf_torch(x_pred_t, self.symmetric)
-            T = corr_real.shape[0]
-            s_idx, t_idx = torch.triu_indices(T, T, offset=1, device=corr_real.device)
-            # Extract correlations for strictly upper triangular pairs
-            real_pairs = corr_real[s_idx, t_idx, :]  
-            pred_pairs = corr_pred[s_idx, t_idx, :]
-            return torch.abs(pred_pairs - real_pairs).mean()
-    
+            acf_real = stats.non_stationary_acf_torch(t(x_real), self.symmetric)
+            acf_pred = stats.non_stationary_acf_torch(t(x_pred), self.symmetric)
+        return (acf_pred - acf_real.to(acf_pred.device)).pow(2).mean().sqrt()
+
 
 class CrossCorrelationMetric(Metric):
     """Mean absolute difference between cross-correlation tensors."""
 
-    def __init__(self, transform=lambda x: x, stationary=False, lags=64, dim=(0, 1)):
+    def __init__(self, lags=64, dim=(0, 1), transform=lambda x: x):
         self.transform = transform
-        self.stationary = stationary
         self.lags = lags
         self.dim = dim
 
@@ -109,16 +107,8 @@ class CrossCorrelationMetric(Metric):
         return 'CrossCorrMetric'
 
     def measure(self, x_real, x_pred):
-        x_real_t = self.transform(x_real)
-        x_pred_t = self.transform(x_pred)
-        
-        if self.stationary:
-            cc_real = stats.cacf_torch(x_real_t, self.lags, self.dim)
-            cc_pred = stats.cacf_torch(x_pred_t, self.lags, self.dim)
-        else:
-            cc_real = stats.non_stationary_cacf_torch(x_real_t, lags=self.lags, dim=self.dim)
-            cc_pred = stats.non_stationary_cacf_torch(x_pred_t, lags=self.lags, dim=self.dim)
-            
+        cc_real = stats.cacf_torch(self.transform(x_real), self.lags, self.dim)
+        cc_pred = stats.cacf_torch(self.transform(x_pred), self.lags, self.dim)
         return torch.abs(cc_pred - cc_real.to(cc_pred.device)).mean()
 
 
@@ -222,7 +212,7 @@ class LpLossMetric(Metric):
         if self.mode == 'abs':
             h = 1.0 / (x_real.size()[1] - 1.0)
             all_norms = (h ** (self.d / self.p)) * torch.norm(
-                x_pred.reshape(num_examples, -1) - x_real.reshape(num_examples, -1), self.p, 1)
+                x_pred.view(num_examples, -1) - x_real.view(num_examples, -1), self.p, 1)
             if self.reduction:
                 if self.size_average:
                     return torch.mean(all_norms)
@@ -583,3 +573,112 @@ class KVDMetric(Metric):
             feat_real = self.model.extract_features(x_real).cpu().numpy()
             feat_pred = self.model.extract_features(x_pred).cpu().numpy()
         return self._polynomial_mmd_averages(feat_pred, feat_real)
+
+
+#-Signature based metric using wasserstein based metric: 
+class SigW1Metric(Metric):
+    """Signature Wasserstein-1 distance using iisignature.
+
+    Computes the truncated Sig-W1 distance between two path distributions
+    by comparing their expected signatures level by level.
+
+    Expects inputs of shape (B, T) or (B, T, D), where B is the batch
+    (sample) dimension and T is the time dimension.
+
+    Parameters
+    ----------
+    m : int
+        Signature truncation level.
+    time_augment : bool
+        If True, prepends a uniform time channel [0, 1] to each path
+        before computing signatures. Recommended for most uses.
+    """
+
+    def __init__(self, m=5, time_augment=True):
+        self.m = m
+        self.time_augment = time_augment
+
+    @property
+    def name(self):
+        return 'SigW1Metric'
+
+    @staticmethod
+    def _time_augment(X):
+        """Prepend a uniform time channel. X: (B, T, D) -> (B, T, D+1)."""
+        B, T, D = X.shape
+        t = np.linspace(0.0, 1.0, T).reshape(1, T, 1)
+        t = np.broadcast_to(t, (B, T, 1))
+        return np.concatenate([t, X], axis=2)
+
+    @staticmethod
+    def _split_levels(sig_flat, d, m):
+        """Split flat iisignature output into a list of per-level arrays.
+        
+        iisignature.sig returns a flat array of shape (B, siglength(d, m))
+        where the levels are concatenated as: d, d^2, ..., d^m.
+        """
+        levels = []
+        idx = 0
+        for k in range(1, m + 1):
+            size = d ** k
+            levels.append(sig_flat[:, idx:idx + size])
+            idx += size
+        return levels
+
+    @staticmethod
+    def _expected_signature(X, m):
+        """Compute the mean signature across the batch, per level.
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (B, T, D)
+        m : int
+
+        Returns
+        -------
+        list of m arrays, one per level, each averaged over the batch
+        """
+        if iisignature is None:
+            raise ImportError("SigW1Metric requires iisignature. Install it with `pip install iisignature`.")
+        d = X.shape[2]
+        # iisignature.sig handles the full batch natively: (B, T, D) -> (B, siglength(d, m))
+        sigs = iisignature.sig(X.astype(np.float32), m)
+        levels = SigW1Metric._split_levels(sigs, d, m)
+        return [lvl.mean(axis=0) for lvl in levels]
+
+    @staticmethod
+    def _sig_w1(exp_sig_real, exp_sig_pred):
+        """Sum of L1 norms of level-wise differences."""
+        return sum(
+            np.sum(np.abs(r-p))
+            for r, p in zip(exp_sig_real, exp_sig_pred)
+        )
+
+    def measure(self, x_real, x_pred):
+        real = x_real.detach().cpu().numpy()
+        pred = x_pred.detach().cpu().numpy()
+
+        # (B, Nx, T) -> (B, Nx, T, 1)
+        if real.ndim == 3:
+            real = real[..., None]
+            pred = pred[..., None]
+
+        _, nx, _, _ = real.shape
+        spatial_loss = 0.0
+
+        # deterministic spatial average
+        for i in range(nx):
+            real_x = real[:, i, :, :]   # (B, T, D)
+            pred_x = pred[:, i, :, :]
+
+            if self.time_augment:
+                real_x = self._time_augment(real_x)
+                pred_x = self._time_augment(pred_x)
+            exp_sig_real = self._expected_signature(real_x, self.m)
+            exp_sig_pred = self._expected_signature(pred_x, self.m)
+
+            spatial_loss += self._sig_w1(exp_sig_real, exp_sig_pred)
+
+        spatial_loss /= nx
+        return torch.tensor(spatial_loss)
+

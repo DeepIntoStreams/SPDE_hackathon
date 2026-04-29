@@ -90,12 +90,39 @@ class SPDEFunc2d(torch.nn.Module):
         return self.F(z), self.G(z).view(z.size(0), self.hidden_channels, self.noise_channels, z.size(2), z.size(3), z.size(4))
 
 
+class SPDEFunc3d(torch.nn.Module):
+    """Pointwise local operators for 3D spatial NSPDE paths.
+
+    PyTorch has no native Conv4d, so this uses the equivalent channel-wise
+    1x1 operation by applying Linear layers at each (x, y, z, t) point.
+    """
+
+    def __init__(self, noise_channels, hidden_channels):
+        super().__init__()
+        self.noise_channels = noise_channels
+        self.hidden_channels = hidden_channels
+
+        self.F = nn.Sequential(nn.Linear(hidden_channels, hidden_channels), nn.Tanh())
+        self.G = nn.Sequential(nn.Linear(hidden_channels, hidden_channels * noise_channels), nn.Tanh())
+
+    def forward(self, z):
+        """ z: (batch, hidden_channels, dim_x, dim_y, dim_z, dim_t)
+        """
+        z_last = z.permute(0, 2, 3, 4, 5, 1)
+        F_z = self.F(z_last).permute(0, 5, 1, 2, 3, 4)
+        G_z = self.G(z_last).permute(0, 5, 1, 2, 3, 4)
+        return F_z, G_z.reshape(
+            z.size(0), self.hidden_channels, self.noise_channels,
+            z.size(2), z.size(3), z.size(4), z.size(5)
+        )
+
+
 class NeuralSPDE(torch.nn.Module):  
 
-    def __init__(self, dim, in_channels, noise_channels, hidden_channels, modes1, modes2=None, modes3=None, n_iter=4, solver='fixed_point', **kwargs):
+    def __init__(self, dim, in_channels, noise_channels, hidden_channels, modes1, modes2=None, modes3=None, modes4=None, n_iter=4, solver='fixed_point', **kwargs):
         super().__init__()
         """
-        dim: dimension of spatial domain (1 or 2 for now)
+        dim: dimension of spatial domain (1, 2, or 3)
         in_channels: the dimension of the solution state space
         noise_channels: the dimension of the control state space
         hidden_channels: the dimension of the latent space
@@ -104,9 +131,12 @@ class NeuralSPDE(torch.nn.Module):
         kwargs: Any additional kwargs to pass to the cdeint solver of torchdiffeq
         """
 
-        assert dim in [1,2], 'dimension of spatial domain (1 or 2 for now)'
+        assert dim in [1,2,3], 'dimension of spatial domain (1, 2, or 3)'
         if dim == 2 and solver in ['fixed_point', 'root_find']:
             assert modes2 is not None and modes3 is not None, 'specify modes2 and modes3' 
+        if dim == 3:
+            assert solver == 'fixed_point', '3d NSPDE currently supports solver=fixed_point only'
+            assert modes2 is not None and modes3 is not None and modes4 is not None, 'specify modes2, modes3, and modes4'
         if dim == 1 and solver in ['fixed_point', 'root_find']:
             assert modes2 is not None and modes3 is None, 'specify modes2 and modes3 should not be specified' 
         if dim == 2 and solver == 'diffeq':
@@ -125,6 +155,8 @@ class NeuralSPDE(torch.nn.Module):
             self.spde_func = SPDEFunc1d(noise_channels, hidden_channels)
         if (dim==2 and solver in ['fixed_point', 'root_find']):
             self.spde_func = SPDEFunc2d(noise_channels, hidden_channels)
+        if dim==3 and solver=='fixed_point':
+            self.spde_func = SPDEFunc3d(noise_channels, hidden_channels)
 
         # linear projection
         readout = [nn.Linear(hidden_channels, 128), nn.ReLU(), nn.Linear(128, in_channels)]
@@ -132,7 +164,7 @@ class NeuralSPDE(torch.nn.Module):
 
         # SPDE solver (for now Picard)
         if solver=='fixed_point':
-            self.solver = NeuralFixedPoint(self.spde_func, n_iter, modes1, modes2, modes3)
+            self.solver = NeuralFixedPoint(self.spde_func, n_iter, modes1, modes2, modes3, modes4)
         elif solver=='diffeq':
             self.solver = DiffeqSolver(hidden_channels, self.spde_func, modes1, modes2, **kwargs)
         elif solver=='root_find': 
@@ -150,15 +182,19 @@ class NeuralSPDE(torch.nn.Module):
         # Actually solve the SPDE. 
         if self.dim==1:
             z0 = self.lift(u0.permute(0,2,1)).permute(0,2,1) 
-        else:
+        elif self.dim==2:
             z0 = self.lift(u0.permute(0,2,3,1)).permute(0,3,1,2)
+        else:
+            z0 = self.lift(u0.permute(0,2,3,4,1)).permute(0,4,1,2,3)
 
         zs = self.solver(z0, xi, grid)
 
         if self.dim==1:
             ys = self.readout(zs.permute(0,2,3,1)).permute(0,3,1,2)
-        else:
+        elif self.dim==2:
             ys = self.readout(zs.permute(0,2,3,4,1)).permute(0,4,1,2,3)
+        else:
+            ys = self.readout(zs.permute(0,2,3,4,5,1)).permute(0,5,1,2,3,4)
         
         return ys
 
