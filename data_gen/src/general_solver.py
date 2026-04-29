@@ -67,16 +67,21 @@ def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=
     soln[:, 0, :] = u0  # set the initial condition
 
     w = np.fft.fft(u0, axis=-1)
-
+    dealias = np.zeros(M)
+    dealias[:M//3] = 1.0          # <-- add these two lines once, BEFORE the time loop
+    dealias[-M//3:] = 1.0 
     for i in tqdm(range(1, N + 1)):
 
         Extra_nonlinearity = 0
-        if Burgers != 0 or KPZ != 0:  # if Burgers or KPZ is present compute space derivative. M/X = (dx)^{-1}
+        if Burgers != 0 or KPZ != 0:
             diff = np.zeros((soln.shape[0], M))
             diff[:, 1:] = np.diff(soln[:, i - 1, :], axis=1) * M / X
             diff[:, 0] = (soln[:, i - 1, 0] - soln[:, i - 1, -1]) * M / X
-        if Burgers != 0:  # add Burgers nonlnearity u*(\partial_x u)
-            Extra_nonlinearity += Burgers * soln[:, i - 1, :] * diff
+        if Burgers != 0:
+            u_phys = soln[:, i - 1, :]
+            u_sq_hat = np.fft.fft(u_phys ** 2, axis=-1) * dealias
+            du_sq = np.fft.ifft(dx * u_sq_hat, axis=-1).real
+            Extra_nonlinearity += Burgers * 0.5 * du_sq   # 6 * 0.5 * ∂_x(u²) = 3∂_x(u²) = 6u∂_x u
         if KPZ != 0:  # add KPZ nonlinearity (\partial_x u)^2
             Extra_nonlinearity += KPZ * diff * diff
 
