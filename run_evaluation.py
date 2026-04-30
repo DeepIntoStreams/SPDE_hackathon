@@ -208,7 +208,11 @@ def main():
                     xp_for = xp.squeeze(1) if (xp.ndim == 4 and xp.shape[1] == 1) else xp
                     val = m.measure(xr_for, xp_for)
 
-                metric_scores[m.name].append(float(val.item()) if isinstance(val, torch.Tensor) else float(val))
+                if isinstance(val, torch.Tensor):
+                    val = val.mean()   # ← THIS FIX
+                    metric_scores[m.name].append(float(val.item()))
+                else:
+                    metric_scores[m.name].append(float(val))
 
         # average per-metric across batches and remap keys
         avg_scores = {mname: torch.tensor(sum(vals) / len(vals)) for mname, vals in metric_scores.items()}
