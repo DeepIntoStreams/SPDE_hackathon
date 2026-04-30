@@ -70,7 +70,7 @@ def test_phi43_smoke(tmp_path):
         fix_u0=True,
         num_tau=8,
         tau_max_multiplier=4.0,
-        include_c12=True,
+        renormalization="invariant_measure",
         seed=0,
     )
 

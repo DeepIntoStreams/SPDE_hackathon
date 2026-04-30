@@ -57,7 +57,7 @@ def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num, lam, basis="si
 
 @hydra.main(version_base=None, config_path="../configs/", config_name="KPZ")
 def main(cfg: DictConfig):
-    
+
     truncations = OmegaConf.to_container(cfg.sim.truncation) if OmegaConf.is_list(cfg.sim.truncation) else [cfg.sim.truncation]
     sigmas = OmegaConf.to_container(cfg.sim.sigma) if OmegaConf.is_list(cfg.sim.sigma) else [cfg.sim.sigma]
     fix_u0_options = OmegaConf.to_container(cfg.sim.fix_u0) if OmegaConf.is_list(cfg.sim.fix_u0) else [cfg.sim.fix_u0]
