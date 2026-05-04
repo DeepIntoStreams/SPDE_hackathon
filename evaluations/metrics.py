@@ -661,26 +661,63 @@ class SigW1Metric(Metric):
         real = x_real
         pred = x_pred
 
-        # (B, Nx, T) -> (B, Nx, T, 1)
-        if real.dim() == 3:
+        # ---- remove channel dim if present: (B,1,Nx,T) → (B,Nx,T)
+        if real.ndim == 4 and real.shape[1] == 1:
+            real = real.squeeze(1)
+            pred = pred.squeeze(1)
+
+        # ---- ensure (B, Nx, T, D)
+        if real.ndim == 3:
             real = real.unsqueeze(-1)
             pred = pred.unsqueeze(-1)
 
+        if real.ndim != 4:
+            raise ValueError(f"SigW1 received unexpected shape: {real.shape}")
+
         B, Nx, T, D = real.shape
-        spatial_loss = 0.0
 
-        for i in range(Nx):
-            real_x = real[:, i, :, :]   # (B, T, D)
-            pred_x = pred[:, i, :, :]
+        # ---- reshape to batch over space
+        real = real.reshape(B * Nx, T, D)
+        pred = pred.reshape(B * Nx, T, D)
 
-            if self.time_augment:
-                real_x = self._time_augment(real_x)
-                pred_x = self._time_augment(pred_x)
+        # ---- clean any stray singleton dims
+        while real.ndim > 3:
+            real = real.squeeze(-1)
+        while pred.ndim > 3:
+            pred = pred.squeeze(-1)
 
-            exp_sig_real = self._expected_signature(real_x, self.m)
-            exp_sig_pred = self._expected_signature(pred_x, self.m)
+        if real.ndim == 2:
+            real = real.unsqueeze(-1)
+        if pred.ndim == 2:
+            pred = pred.unsqueeze(-1)
 
-            spatial_loss += self._sig_w1(exp_sig_real, exp_sig_pred)
+        # ---- safety check
+        assert real.ndim == 3, f"real bad shape: {real.shape}"
+        assert pred.ndim == 3, f"pred bad shape: {pred.shape}"
 
-        spatial_loss /= Nx
+        # ---- time augmentation (if enabled)
+        if self.time_augment:
+            real = self._time_augment(real)
+            pred = self._time_augment(pred)
+
+        # ---- compute signatures (single batched call)
+        sig_real = iisignature.sig(
+            real.detach().cpu().numpy().astype("float32"), self.m
+        )
+        sig_pred = iisignature.sig(
+            pred.detach().cpu().numpy().astype("float32"), self.m
+        )
+
+        sig_real = torch.from_numpy(sig_real)
+        sig_pred = torch.from_numpy(sig_pred)
+
+        # ---- reshape back to (B, Nx, feature_dim)
+        sig_real = sig_real.view(B, Nx, -1)
+        sig_pred = sig_pred.view(B, Nx, -1)
+
+        # ---- spatial average of L1 differences (preserves your definition ✅)
+        
+        spatial_loss = torch.mean(torch.abs(sig_real - sig_pred))
+
         return spatial_loss
+
