@@ -94,7 +94,8 @@ def general_1d_solver(L, u0, W, mu, sigma=lambda x: 1, T=1, X=1, Burgers=0, KPZ=
         w = ((1 + 0.5 * Lk * dt) * w + np.fft.fft(RHS_noise + RHS_extra, axis=-1) + Dk * np.fft.fft(RHS_drift,
                                                                                                     axis=-1)) / (
                         1 - 0.5 * Lk * dt)
-
+        w = w * dealias
+        w[~np.isfinite(w)] = 0.0 
         # Going back to the physiscal space
         if compl:
             soln[:, i, :] = np.fft.ifft(w, axis=-1)
