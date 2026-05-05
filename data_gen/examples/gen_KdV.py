@@ -15,8 +15,10 @@ from data_gen.src.general_solver import general_1d_solver
 
 
 # smooth Q noise as in Example 10.8 of `An Introduction to Computational Stochastic PDEs' by Lord, Powell & Shardlow
-def q_spectrum(modes, lengths, r):
+def smooth_corr( modes, lengths, r):
     j = modes[0]
+    if j == 0:
+        return 0.0
     return (j // 2 + 1) ** (-r)
 
 def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
@@ -43,14 +45,14 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
 
     # stochastic forcing
     if noise_type == 'Q':
-        W_smooth = noise.WN_space_time(
-            s,
-            t,
-            dt * 0.1,
+        r = 4  # Creates r/2 spatially smooth noise
+        corr = lambda modes, lengths: smooth_corr(modes, lengths, r + 1.001)
+        noise_q = NoiseND(covariance='q_wiener', q_spectrum=corr)
+        W_smooth = noise_q.WN_space_time_KPZ(
+            s, t, dt * 0.1,
             bounds=((a, b),),
             steps=(dx,),
             truncation=(truncation + 1,),
-            num=num,
         )
         W_smooth = W_smooth[:, ::10, :]
     elif noise_type == 'cyl':
