@@ -27,20 +27,20 @@ def simulator(a, b, Nx, s, t, Nt, truncation, sigma, fix_u0, num):
     ic = lambda x: x*(1-x) # initial condition (fixed part)
     if not fix_u0: # varying initial condition
         X_ = np.linspace(-0.5,0.5,Nx+1)
-        ic_ = noise.initial(num, (X_,), scaling=1)[:, :]
+        ic_ = noise.initial(num, (X_,))[:, :]
         ic = 0.1*(ic_ - ic_[:,0,None]) + ic(O_X)
         print("u0 is varying!")
     else:
         print("u0 is fixed!")
 
-    W = noise.WN_space_time_many(
+    W = noise.WN_space_time(
         s,
         t,
         dt,
         bounds=((a, b),),
         steps=(dx,),
-        num=num,
         truncation=(truncation + 1,),
+        num=num,
     )
     Soln_add = SPDE(BC = 'P', IC = ic, mu = mu, sigma = sigma).Parabolic(W, O_T, O_X) # solve parabolic equation
 

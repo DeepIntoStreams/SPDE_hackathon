@@ -4,7 +4,7 @@ sim:
   Nx: 128  # dx = (b-a)/Nx
   s: 0
   t: 0.5
-  Nt: 50  # dt = (t-s)/Nt = 1e-2
+  Nt: 200 # dt = (t-s)/Nt = 1e-2
   noise_type: Q  # ${noise_type}  # either 'cyl' or 'Q'
   truncation: 128  # sim.truncation=32,64,128,256
   sigma: 0.1  # coefficient of additive diffusive term

@@ -65,6 +65,7 @@ from evaluations.metrics import (
     MeanAbsDiffMetric,
     VARMetric,
     ESMetric,
+    SigW1Metric,
 )
 
 
@@ -81,6 +82,7 @@ METRIC_REGISTRY = {
     'MAD':       (lambda: MeanAbsDiffMetric(),                   'Mean absolute difference'),
     'VaR':       (lambda: VARMetric(alpha=0.05),                 'Value-at-Risk (alpha=0.05)'),
     'ES':        (lambda: ESMetric(alpha=0.05),                  'Expected Shortfall (alpha=0.05)'),
+    'SigW1':     (lambda: SigW1Metric(m=5,time_augment=True), 'Signature Wasserstein-1 distance'), 
 }
 
 DEFAULT_METRICS = ['LpLoss', 'RMSE']
@@ -192,6 +194,13 @@ def main():
                     xr_hs = xr2.unsqueeze(2) if xr2.ndim == 3 else xr2
                     xp_hs = xp2.unsqueeze(2) if xp2.ndim == 3 else xp2
                     val = m.measure(xr_hs, xp_hs)
+                
+                # SigW1 expects full spatiotemporal structure:
+                # (B, Nx, T) or (B, Nx, T, 1)
+                elif isinstance(m, SigW1Metric):
+                    xr_sig = xr[..., 1:] if xr.dim() >= 3 else xr
+                    xp_sig = xp[..., 1:] if xp.dim() >= 3 else xp
+                    val = m.measure(xr_sig, xp_sig) 
 
                 # other metrics: pass batches (remove channel dim if present)
                 else:
@@ -199,7 +208,12 @@ def main():
                     xp_for = xp.squeeze(1) if (xp.ndim == 4 and xp.shape[1] == 1) else xp
                     val = m.measure(xr_for, xp_for)
 
-                metric_scores[m.name].append(float(val.item()) if isinstance(val, torch.Tensor) else float(val))
+                if isinstance(val, torch.Tensor):
+                    val = val.mean()   # ← THIS FIX
+                    metric_scores[m.name].append(float(val.item()))
+                else:
+                    metric_scores[m.name].append(float(val))
+
 
         # average per-metric across batches and remap keys
         avg_scores = {mname: torch.tensor(sum(vals) / len(vals)) for mname, vals in metric_scores.items()}

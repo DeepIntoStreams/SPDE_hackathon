@@ -21,20 +21,22 @@ def save_h5(path, arrays):
 
 
 # smooth Q noise as in Example 10.8 of `An Introduction to Computational Stochastic PDEs' by Lord, Powell & Shardlow
-def smooth_corr(coords, modes, lengths, r):
-    x = coords[0]
+def smooth_corr( modes, lengths, r):
     j = modes[0]
-    a = lengths[0]
+    if j == 0:
+        return 0.0
+    return (j // 2 + 1) ** (-r)
 
-    def q(j):
-        if j == 0:
-            return 0
-        return (j // 2 + 1) ** (-r)
-
-    return np.sqrt(q(j)) * np.sqrt(2 / a) * np.sin(j * np.pi * x / a)
 
 def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
-    noise = NoiseND()
+    noise = (
+        NoiseND(
+            covariance="q_wiener",
+            q_spectrum=lambda modes, lengths: q_spectrum(modes, lengths, 5.001),
+        )
+        if noise_type == "Q"
+        else NoiseND(covariance="cylindrical")
+    )
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
     O_X = noise.partition_axis(a, b, dx)
     O_T = noise.partition_axis(s, t, dt)
@@ -42,7 +44,7 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
     u0 = np.array([[np.sin(2*np.pi*x) for x in np.linspace(a, b, Nx + 1)[:-1]] for _ in range(num)])  # initial condition
     if not fix_u0:  # varying initial condition
         X_ = np.linspace(-0.5, 0.5, Nx + 1)
-        ic_ = noise.initial(num, (X_,), scaling=1, dirichlet=True)[..., :-1]
+        ic_ = noise.initial(num, (X_,))[..., :-1]
         u0 = (ic_ - ic_[:, 0, None]) + u0
         print("u0 is varying!")
     else:
@@ -51,27 +53,25 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
     # stochastic forcing
     if noise_type == 'Q':
         r = 4  # Creates r/2 spatially smooth noise
-        corr = lambda coords, modes, lengths: smooth_corr(coords, modes, lengths, r + 1.001)
-        W_smooth = noise.WN_space_time_many(
+        corr = lambda coords, modes, lengths: smooth_corr( modes, lengths, r + 1.001)
+        W_smooth = noise.WN_space_time(
             s,
             t,
             dt * 0.1,
             bounds=((a, b),),
             steps=(dx,),
-            num=num,
             truncation=(truncation + 1,),
-            correlation=corr,
         )
         W_smooth = W_smooth[:, ::10, :]
     elif noise_type == 'cyl':
-        W_smooth = noise.WN_space_time_many(
+        W_smooth = noise.WN_space_time(
             s,
             t,
             dt,
             bounds=((a, b),),
             steps=(dx,),
-            num=num,
             truncation=(truncation + 1,),
+            num=num,
         )
     else:
         print('Invalid noise type!')
