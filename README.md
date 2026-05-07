@@ -1,24 +1,18 @@
-# SPDEBench: An Extensive Benchmark for Learning Regular and Singular Stochastic PDEs
+# SPDEBench: An Extensive Benchmark for Learning Stochastic PDEs
 
-SPDEBench is designed to solve typical SPDEs of physical significance (i.e.
-the $\Phi^4_d$, wave, incompressible Navier-Stokes, and KdV equations) on 1D or 2D tori driven by white noise via ML
-methods. New datasets for singular SPDEs based on the renormalization process have been constructed, and novel ML models
-achieving the best results to date have been proposed. Results are benchmarked with traditional numerical solvers and
-ML-based models, including FNO, NSPDE and DLR-Net, etc. 
+SPDEBench provides ready-to-use datasets ([Hugging Face](https://huggingface.co/datasets/SSPDEBench/Reuglar_and_Singular_SPDEBench)) for physically and mathematically significant SPDEs on 1-3D domains with periodic or Dirichlet boundary conditions. Both regular and singular SPDEs are taken into consideration. SPDEBench also incorporates representative ML baselines in operator learning, together with 7 evaluation metrics, including Sobolev and distributional metrics beyond the standard $L^2$ error. This repository contains the code used to generate datasets, train models, and evaluate results for the accompanying paper.
 
 Below, we provide instructions on how to use code in this repository to generate datasets and train models as in our paper.
 
-![Phi42](https://github.com/DeepIntoStreams/SPDE_hackathon/blob/main/Phi42_xi_eps_128_sigma_1_249.png)
+![Phi42](Phi42_xi_eps_128_sigma_1_249.png)
 
 ---
 
 ## Requirements
 
-The code has been tested with Python 3.8 and PyTorch 2.4.1 (CUDA 11.8). For Linux users, we recommend installing PyTorch with the following command:
-```setup
-conda install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1  pytorch-cuda=11.8 -c pytorch -c nvidia
-```
-Alternatively, you can refer to the [official PyTorch website](https://pytorch.org/get-started/previous-versions/) for other installation options.
+The project configuration supports Python >=3.9 and <3.13, with PyTorch >=2.1 and <2.4.
+Install PyTorch using the command recommended for your platform and CUDA version on the
+[official PyTorch website](https://pytorch.org/get-started/locally/).
 
 To install the remaining dependencies:
 ```setup
@@ -33,173 +27,87 @@ To generate the data, run the corresponding python files in `data_gen/examples/`
 of $\Phi^4_2$ equation with varying initial conditions and noise truncation degree 128, run the following:
 
 ```bash
+cd data_gen/examples
 python gen_phi42.py sim.fix_u0=False sim.eps=128
 ```
 
-Settings of the equation can be tailored by choose different values for config args.
+Equation settings can be tailored by choosing different config values. Common configuration arguments include:
 
-- `a`,`b`,`Nx` (and `c`,`d`,`Ny` in 2D case): begin point, end point, space resolution.
-- `s`,`t`,`Nt`: start time, end time, time resolution.
-- `truncation` or `eps`: truncation degree of noise.
-- `sigma`: coefficient in the additive diffusive term.
-- `fix_u0`: `True`--fix initial condition; `False`--vary initial condition among samples.
-- `num`: number of samples generated.
-- `sub_x`,`sub_t`
-- `save_dir`
-- `save_name`
+- `a`, `b`, `Nx` (and `c`, `d`, `Ny` in 2D cases): spatial domain and resolution.
+- `s`, `t`, `Nt`: time interval and resolution.
+- `truncation` or `eps`: noise truncation level.
+- `sigma`: coefficient for the additive noise term.
+- `fix_u0`: whether to fix the initial condition across samples.
+- `num`: number of generated samples.
+- `sub_x`, `sub_t`: spatial and temporal subsampling rates.
+- `save_dir`, `save_name`: output directory and file name.
 
-(More details about the config args will be added later.)
+These are representative examples. Please refer to the corresponding YAML file in `data_gen/configs/` and the generation script in `data_gen/examples/` for equation-specific options.
+
 
 ---
 
 ## Models
 
-This repository contains code for seven ML models: NCDE, NRDE, NCDE-FNO, DeepONet, FNO, NSPDE, and a novel ML model
-called NSPDE-S.
+This repository contains code for multiple ML models, including NCDE, NRDE, NCDE-FNO, DeepONet, FNO, WNO, DLR-Net,
+Galerkin Transformer, NSPDE / NSPDE-S, and NORS.
 To train the model, run `train1d.py` or `train2d.py` in the corresponding folder named by the model.
-For instance, after setting proper config args in corresponding `.yaml` file, run the following:
+For instance, after setting proper config args in corresponding `.yaml` file, change the working directory to the corresponding model folder and run the following:
 
 ```bash
 python train1d.py
 ```
 
-### Brief introduction to key config args in models
+### Brief introduction to common model config args
 
-- `task`: `xi` (or `u0xi` if applicable)
-- `data_path`: Directory where the datasets are saved.
-- `dim_x`: Number of points in space dimension.
-- `T`: Total number of time steps (i.e. time sequence length).
-- `sub_t`: Subsampling interval. Use all time steps in data if sub_t=1, or sample every sub_t steps to reduce data density.
-- `ntrain`,`nval`,`ntest`: Number of samples in the training, validation, and test sets.
-- `epochs`: Total number of training epochs.
-- `batch_size`: Number of samples per batch.
-- `learning_rate`: Initial learning rate.
-- `weight_decay`: Used in the optimizer.
-- `scheduler_step`: Interval (in epochs) for learning rate adjustment.
-- `scheduler_gamma`: Learning rate decay factor. At each adjustment, the learning rate is multiplied by this value.
-- `plateau_patience`: Used in some scheduler to control the reduction of learning rate.
-- `plateau_terminate`: Early stop the training if validation loss doesn't improve after such number of epochs.
-- `delta`: Minimum threshold for improvement.
-- `print_every`: Training log frequency.
-- `save_dir`: Directory where output files (i.e. checkpoints) will be saved.
-- `checkpoint_file`: File name of model checkpoints (.pth).
-- `log_file`: File where results of hyperparameter search will be logged.
+Common configuration arguments include:
 
-(More details about the config args will be added later.)
+- `data_path`: path to the dataset used for training and evaluation.
+- `ntrain`, `nval`, `ntest`: number of training, validation, and test samples.
+- `batch_size`: batch size.
+- `epochs`: number of training epochs.
+- `learning_rate`: initial learning rate.
+- `weight_decay`: optimizer weight decay, when used.
+- `sub_t`, `sub_x`: temporal and spatial subsampling intervals, when used.
+- `dim_x`, `dim_y`, `T`: spatial and temporal grid sizes, when used.
+- `plateau_patience`, `plateau_terminate`, `delta`: learning-rate scheduling and early-stopping settings, when used.
+- `save_dir`: output directory for checkpoints and logs.
+- `checkpoint_file`: checkpoint file name.
 
-#### NCDE specific args:
+These are representative examples rather than a complete schema. For model-specific options, please refer to the corresponding YAML file in `model/config/` and the training script in each model folder.
 
-- `hidden_channels`
-- `solver`
-
-#### NRDE specific args:
-
-- `hidden_channels`
-- `solver`
-- `depth`
-- `window_length`
-
-#### NCDE-FNO specific args:
-
-- `hidden_channels`
-- `solver`
-
-#### DeepONet specific args:
-
-- `width`
-- `branch_depth`
-- `trunk_depth`
-
-#### FNO specific args:
-
-- `L`
-- `modes1`
-- `modes2`
-
-#### NSPDE / NSPDE-S specific args:
-
-- `hidden_channels`
-- `n_iter`
-- `modes1`
-- `modes2`
 
 ---
 
 ## Directory Structure
 
 ```
-SPDE_hackathon          
-├───data_gen
-│   ├───configs    # YAML configuration files specifying parameters for data generation (.yaml)
-│   │       
-│   ├───examples
-│   │       gen_KdV.py
-│   │       gen_navier_stokes.py
-│   │       gen_phi41.py
-│   │       gen_phi42.py
-│   │       gen_wave.py
-│   │       gen_KDV.py
-│   │                 
-│   ├───notebook    # Jupyter notebooks for visualizing the generated data (.ipynb)
-│   │       
-│   └───src    # Core scripts for SPDE solver generation (.py).
-│           
-└───model
-    │   utilities.py
-    │   
-    ├───config    # All the config files for models
-    │   
-    ├───evaluation    # Evaluation and test metric for models
-    │       
-    ├───DeepONet
-    │       deepOnet.py
-    │       train1d.py
-    │       
-    ├───DLR
-    │       Graph.py
-    │       RSlayer.py
-    │       RSlayer_2d.py
-    │       Rule.py
-    │       SPDEs.py
-    │       train1d.py
-    │       train2d.py
-    │       utils.py
-    │       utils2d.py
-    │       
-    ├───FNO
-    │       FNO1D.py
-    │       FNO2D.py
-    │       train1d.py
-    │       train2d.py
-    │       
-    ├───NCDE
-    │       NCDE.py
-    │       train1d.py
-    │       
-    ├───NCDEFNO
-    │       NCDEFNO_1D.py
-    │       train1d.py
-    │       
-    ├───NRDE
-    │       NRDE.py
-    │       train1d.py
-    │       
-    └───NSPDE
-            diffeq_solver.py
-            fixed_point_solver.py
-            gradients.py
-            linear_interpolation.py
-            neural_aeps_spde.py
-            neural_spde.py
-            root_find_solver.py
-            root_finding_algorithms.py
-            SPDEs2D.py
-            train1d.py
-            train2d.py
-            train2d_aeps.py
-            train2d_alleps.py
-            utilities.py
-            utilities_aeps.py
+SPDE_hackathon
+|-- data_gen
+|   |-- configs        # YAML configuration files for data generation
+|   |-- examples       # Data generation entry scripts
+|   `-- src            # Core SPDE solver and noise generation utilities
+|-- evaluations        # Evaluation metrics, statistics, and plotting utilities
+|-- model
+|   |-- config         # YAML configuration files for model training
+|   |-- DeepONet
+|   |-- DLR
+|   |-- FNO
+|   |-- GalerkinTransformer
+|   |-- NCDE
+|   |-- NCDEFNO
+|   |-- NORS
+|   |-- NRDE
+|   |-- NSPDE
+|   |-- WNO
+|   `-- utilities.py
+|-- predictions
+|-- tests
+|-- generate_prediction_files.py
+|-- generate_sig_w1_test_data.py
+|-- run_evaluation.py
+|-- pyproject.toml
+`-- requirements.txt
 ```
 
 ---
