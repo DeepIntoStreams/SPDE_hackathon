@@ -1,4 +1,4 @@
-torch>=2.1,<2.4
+torch>=2.1,<2.5
 numpy
 iisignature
 torchcde==0.2.5

@@ -10,7 +10,7 @@ Below, we provide instructions on how to use code in this repository to generate
 
 ## Requirements
 
-The project configuration supports Python >=3.9 and <3.13, with PyTorch >=2.1 and <2.4.
+The project configuration supports Python >=3.9 and <3.13, with PyTorch >=2.1 and <2.5.
 Install PyTorch using the command recommended for your platform and CUDA version on the
 [official PyTorch website](https://pytorch.org/get-started/locally/).
 
