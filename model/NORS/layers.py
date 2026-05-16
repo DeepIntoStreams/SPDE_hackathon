@@ -60,7 +60,7 @@ class ParabolicIntegrate1D(nn.Module):
         out = torch.zeros_like(source)
         mat = self.mat.to(device=source.device, dtype=source.dtype)
         for i in range(1, self.nt):
-            out[:, i] = out[:, i - 1] @ mat + source[:, i] * self.dt
+            out[:, i] = (out[:, i - 1] + source[:, i] * self.dt) @ mat
         return out
 
     def forward(
@@ -81,8 +81,6 @@ class ParabolicIntegrate1D(nn.Module):
         for idx, (name, deps) in enumerate(self.graph.items()):
             if XiFeature is not None and "u_0" not in name:
                 features.append(XiFeature[..., idx])
-            elif name == "xi":
-                features.append(xi)
             elif name == "I_c[u_0]":
                 if U0_path is None:
                     features.append(torch.zeros_like(xi))
@@ -91,7 +89,8 @@ class ParabolicIntegrate1D(nn.Module):
             else:
                 source = torch.ones_like(xi)
                 for dep_name, power in deps.items():
-                    source = source * features[self.name_to_index[dep_name]].pow(power)
+                    dep = xi if dep_name == "xi" else features[self.name_to_index[dep_name]]
+                    source = source * dep.pow(power)
                 features.append(self.heat_integrate(source))
         return torch.stack(features, dim=-1)
 
@@ -155,8 +154,6 @@ class ParabolicIntegrate2D(nn.Module):
         for idx, (name, deps) in enumerate(self.graph.items()):
             if XiFeature is not None and "u_0" not in name:
                 features.append(XiFeature[..., idx])
-            elif name == "xi":
-                features.append(xi)
             elif name == "I_c[u_0]":
                 if U0_path is None:
                     features.append(torch.zeros_like(xi))
@@ -165,7 +162,8 @@ class ParabolicIntegrate2D(nn.Module):
             else:
                 source = torch.ones_like(xi)
                 for dep_name, power in deps.items():
-                    source = source * features[self.name_to_index[dep_name]].pow(power)
+                    dep = xi if dep_name == "xi" else features[self.name_to_index[dep_name]]
+                    source = source * dep.pow(power)
                 features.append(self.heat_integrate(source))
         return torch.stack(features, dim=-1)
 

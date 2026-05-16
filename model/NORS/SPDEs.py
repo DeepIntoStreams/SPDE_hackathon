@@ -40,7 +40,7 @@ class SPDE:
         mat = self._parabolic_matrix(len(X), dt, dx).T
         out = np.zeros_like(source)
         for i in range(1, len(T)):
-            out[:, i] = out[:, i - 1] @ mat + source[:, i] * dt
+            out[:, i] = (out[:, i - 1] + source[:, i] * dt) @ mat
         return out
 
     def Integrate_Parabolic_trees(self, model, planted=None, exceptions=None, derivative=False):
@@ -48,9 +48,10 @@ class SPDE:
         exceptions = set() if exceptions is None else set(exceptions)
         out = {}
         for tree, value in model.items():
-            if tree in planted or tree in exceptions:
+            integrated_tree = f"I[{tree}]"
+            if integrated_tree in planted or integrated_tree in exceptions:
                 continue
-            out[f"I[{tree}]"] = self._heat_integrate_1d(value)
+            out[integrated_tree] = self._heat_integrate_1d(value)
         return out
 
     def _laplace_i_2d(self, arr, dt, dx):
@@ -87,7 +88,8 @@ class SPDE:
         exceptions = set() if exceptions is None else set(exceptions)
         out = {}
         for tree, value in model.items():
-            if tree in planted or tree in exceptions:
+            integrated_tree = f"I[{tree}]"
+            if integrated_tree in planted or integrated_tree in exceptions:
                 continue
-            out[f"I[{tree}]"] = self._heat_integrate_2d(value)
+            out[integrated_tree] = self._heat_integrate_2d(value)
         return out

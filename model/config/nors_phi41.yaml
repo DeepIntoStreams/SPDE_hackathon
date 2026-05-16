@@ -16,6 +16,7 @@ noise_deg: -1.5
 deg_cutoff: 7.5
 rs_eps: 1.0
 boundary: P
+noise_scale: 0.1
 
 modes_x: 16
 modes_t: 16

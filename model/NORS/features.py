@@ -25,13 +25,14 @@ def parabolic_graph(data, height=2, kernel_deg=2, noise_deg=-1.5, free_num=3, de
     return graph
 
 
-def cacheXiFeature(graph, T, X, W, device, batch_size=100, eps=1.0, boundary="P", diff=False):
+def cacheXiFeature(graph, T, X, W, device, batch_size=100, eps=1.0, boundary="P", diff=True, noise_scale=1.0):
     """DLR-compatible cache of Xi-only 1D model feature vectors.
 
     Returns a tensor with shape [N, T, X, C], where C is len(graph). Features
     involving u0 are present as zero channels, matching the graph indices used
     later when full features are built with a latent initial-condition path.
     """
+    W = torch.as_tensor(W).float() * noise_scale
     layer = ParabolicIntegrate(graph, T=T, X=X, eps=eps, BC=boundary).to(device)
     loader = DataLoader(TensorDataset(W), batch_size=batch_size, shuffle=False)
     chunks = []
@@ -41,10 +42,22 @@ def cacheXiFeature(graph, T, X, W, device, batch_size=100, eps=1.0, boundary="P"
     return torch.cat(chunks, dim=0)
 
 
-def build_mfv_1d(graph, T, X, W, U0=None, device=None, batch_size=100, eps=1.0, boundary="P", diff=False):
+def build_mfv_1d(
+    graph,
+    T,
+    X,
+    W,
+    U0=None,
+    device=None,
+    batch_size=100,
+    eps=1.0,
+    boundary="P",
+    diff=True,
+    noise_scale=1.0,
+):
     """Build full 1D non-singular MFV, optionally including u0-dependent features."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch.device(device)
-    W = torch.as_tensor(W).float()
+    W = torch.as_tensor(W).float() * noise_scale
     U0 = None if U0 is None else torch.as_tensor(U0).float()
     layer = ParabolicIntegrate(graph, T=T, X=X, eps=eps, BC=boundary).to(device)
     if U0 is None:
@@ -93,5 +106,6 @@ def build_mfv_1d_from_mat(
         batch_size=batch_size,
         eps=eps,
         boundary=boundary,
+        noise_scale=0.1,
     )
     return {"x": mfv.numpy(), "u": data["sol"], "graph": graph, **data}

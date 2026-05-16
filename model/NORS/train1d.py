@@ -67,6 +67,8 @@ def make_cached_loaders(data, graph, cfg, device):
         batch_size=cfg.mfv_batch_size,
         eps=cfg.rs_eps,
         boundary=cfg.boundary,
+        diff=True,
+        noise_scale=cfg.get("noise_scale", 0.1),
     ).float()
 
     train_set = TensorDataset(subset_tensor(mfv, train_idx), subset_tensor(U, train_idx))

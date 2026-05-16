@@ -39,14 +39,14 @@ class Graph:
         else:
             model = {"I[xi]": lollipop}
 
-        graph = {"xi": {}}
+        graph = {}
         planted = {"I[xi]"}
         done = self.R.degrees.copy()
         graph["I[xi]"] = {"xi": 1}
 
         if extra_planted is not None:
             model.update(extra_planted)
-            planted = planted.union(sorted(extra_planted.keys()))
+            planted = planted.union(set(extra_planted.keys()))
             graph.update({key: {} for key in extra_deg.keys()})
             done.update(extra_deg)
 
@@ -59,14 +59,14 @@ class Graph:
         else:
             model = {"I[xi]": lollipop}
 
-        graph = {"xi": {}}
+        graph = {}
         planted = {"I[xi]"}
         done = self.R.degrees.copy()
         graph["I[xi]"] = {"xi": 1}
 
         if extra_planted is not None:
             model.update(extra_planted)
-            planted = planted.union(sorted(extra_planted.keys()))
+            planted = planted.union(set(extra_planted.keys()))
             graph.update({key: {} for key in extra_deg.keys()})
             done.update(extra_deg)
 
@@ -77,7 +77,7 @@ class Graph:
         extra_values = self.extra_trees(W)
         for _ in range(1, self.H):
             for width in range(1, self.R.max + 1):
-                for words in comb(sorted(planted), width):
+                for words in comb([word for word in planted], width):
                     tree, dic = self.R.words_to_tree(words)
                     temp_deg = self.tree_deg(dic, done)
                     if (
@@ -104,7 +104,7 @@ class Graph:
                         done[new_tree] = deg
 
             this_round = self.I(model, planted, self.R.exceptions, self.derivative)
-            keys = [tree for tree in sorted(this_round.keys()) if tree not in self.R.degrees and tree not in planted]
+            keys = [tree for tree in this_round.keys() if tree not in self.R.degrees and tree not in planted]
             for integrated_tree in keys:
                 inner = integrated_tree[2:-1] if integrated_tree[1] == "[" else integrated_tree[3:-1]
                 model[integrated_tree] = this_round.pop(integrated_tree)
