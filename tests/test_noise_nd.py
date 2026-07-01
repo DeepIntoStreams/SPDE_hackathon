@@ -2,6 +2,7 @@ import os
 import sys
 
 import numpy as np
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -22,10 +23,10 @@ def test_wiener_noise_shapes_for_1d_2d_3d():
     noise = NoiseND()
     np.random.seed(0)
 
-    w1 = noise.WN_space_time_single(
+    w1 = noise.WN_space_time(
         0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(0.5,), truncation=(4,)
     )
-    w2 = noise.WN_space_time_single(
+    w2 = noise.WN_space_time(
         0.0,
         0.2,
         0.1,
@@ -33,14 +34,14 @@ def test_wiener_noise_shapes_for_1d_2d_3d():
         steps=(0.5, 0.5),
         truncation=(4, 3),
     )
-    w3 = noise.WN_space_time_many(
+    w3 = noise.WN_space_time(
         0.0,
         0.2,
         0.1,
         bounds=((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
         steps=(0.5, 0.5, 0.5),
-        num=2,
         truncation=(2, 3, 4),
+        num=2,
     )
 
     assert w1.shape == (3, 3)
@@ -49,6 +50,75 @@ def test_wiener_noise_shapes_for_1d_2d_3d():
     assert np.allclose(w1[0], 0.0)
     assert np.allclose(w2[0], 0.0)
     assert np.allclose(w3[:, 0], 0.0)
+
+
+def test_q_wiener_scales_modes_by_spectrum():
+    cylindrical = NoiseND()
+    q_wiener = NoiseND(
+        covariance="q_wiener",
+        q_spectrum=lambda modes, lengths: 0.25 if modes == (1,) else 1.0,
+    )
+    x = cylindrical.partition_axis(-1.0, 2.0, 1.0)
+
+    basis_cyl = cylindrical._spatial_basis((x,), (3,), (3.0,))
+    basis_q = q_wiener._spatial_basis((x,), (3,), (3.0,))
+
+    assert np.allclose(basis_q[0], 0.5 * basis_cyl[0])
+    assert np.allclose(basis_q[1:], basis_cyl[1:])
+
+
+def test_fourier_noise_is_real_with_conjugate_coefficients():
+    noise = NoiseND(basis="fourier")
+    np.random.seed(0)
+
+    w = noise.WN_space_time(
+        0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(1.0 / 6.0,), truncation=(5,)
+    )
+
+    assert np.isrealobj(w)
+    assert w.shape == (3, 7)
+    assert np.allclose(w[0], 0.0)
+
+
+def test_fourier_initial_condition_is_real_with_conjugate_coefficients():
+    noise = NoiseND(basis="fourier")
+    x = noise.partition_axis(0.0, 1.0, 1.0 / 6.0)
+    np.random.seed(0)
+
+    init = noise.initial(3, (x,), truncation=(5,))
+
+    assert np.isrealobj(init)
+    assert init.shape == (3, 7)
+    assert np.allclose(init[:, 0], init[:, -1])
+
+
+def test_fourier_truncation_must_be_odd():
+    noise = NoiseND(basis="fourier")
+
+    with pytest.raises(ValueError, match="fourier truncation must be odd"):
+        noise.WN_space_time(
+            0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(0.25,), truncation=(4,)
+        )
+
+
+def test_fourier_truncation_must_not_alias_grid():
+    noise = NoiseND(basis="fourier")
+
+    with pytest.raises(ValueError, match="unique periodic grid points"):
+        noise.WN_space_time(
+            0.0, 0.2, 0.1, bounds=((0.0, 1.0),), steps=(0.25,), truncation=(7,)
+        )
+
+
+def test_sin_basis_vanishes_on_interval_endpoints():
+    noise = NoiseND(basis="sin")
+    x = noise.partition_axis(-1.0, 2.0, 1.0)
+    basis = noise._spatial_basis((x,), (3,), (3.0,))
+
+    assert basis.shape == (3, 4)
+    assert np.allclose(basis[:, 0], 0.0)
+    assert np.allclose(basis[:, -1], 0.0)
+    assert not np.allclose(basis[0], 0.0)
 
 
 def test_initial_shapes_and_periodic_endpoint():

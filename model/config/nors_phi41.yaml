@@ -1,0 +1,47 @@
+model: NORS
+equation: Phi41+
+data: Phi41+sigma01_xi_trc128_1200
+
+data_path: "../../data_gen/results/${equation}/${data}.mat"
+
+max_t: null
+sub_t: 1
+sub_x: 1
+
+free_num: 3
+include_u0_products: true
+height: 2
+kernel_deg: 2
+noise_deg: -1.5
+deg_cutoff: 7.5
+rs_eps: 1.0
+boundary: P
+
+modes_x: 16
+modes_t: 16
+width: 16
+layers: 4
+padding: 6
+
+ntrain: 840
+nval: 180
+ntest: 180
+batch_size: 32
+mfv_batch_size: 100
+num_workers: 0
+
+epochs: 1000
+learning_rate: 1e-3
+weight_decay: 1e-5
+plateau_patience: 50
+plateau_terminate: 100
+scheduler_factor: 0.5
+min_lr: 1e-7
+delta: 0.0
+
+print_every: 100
+seed: 3407
+device: null
+
+save_dir: "../result/${model}_${equation}/"
+checkpoint_file: "${data}.pth"

@@ -1,4 +1,4 @@
-torch>=2.1,<2.4
+torch>=2.1,<2.5
 numpy
 iisignature
 torchcde==0.2.5
@@ -7,7 +7,9 @@ scikit-learn
 pandas
 tqdm
 matplotlib
+seaborn
 hydra-core
 omegaconf
 h5py
 pytorch-wavelets
+sympy

@@ -22,7 +22,7 @@ def build_initial_conditions(num, grid, fix_u0):
         return np.zeros((num, len(grid), len(grid), len(grid)), dtype=np.float32)
 
     noise = NoiseND()
-    ic = 0.1 * noise.initial(num, (grid, grid, grid), scaling=1)
+    ic = 0.1 * noise.initial(num, (grid, grid, grid))
     ic = ic - ic[:, :1, :1, :1]
     print("u0 is varying!")
     return ic.astype(np.float32)
@@ -45,13 +45,21 @@ def build_save_dict(x, y, z, t, w, sol, spde, pre, save_single_path_tcxyz):
         "eps": np.array(spde.eps, dtype=np.float64),
         "Cmass": np.array(pre.Cmass, dtype=np.float64),
     }
+    if pre.Cmass_path is not None:
+        mdict["Cmass_t"] = pre.Cmass_path.detach().cpu().numpy().astype(np.float64)
     if save_single_path_tcxyz:
         mdict["W_single_tcxyz"] = single_path_tcxyz(w).astype(np.float32)
         mdict["sol_single_tcxyz"] = single_path_tcxyz(sol).astype(np.float32)
     return mdict
 
 
-def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, include_c12, seed=0):
+def resolve_save_dir(save_dir):
+    if osp.isabs(save_dir):
+        return save_dir
+    return osp.abspath(osp.join(current_directory, save_dir))
+
+
+def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, renormalization, seed=0):
     spde = SPDE3D(
         N=N,
         dt=dt,
@@ -59,7 +67,7 @@ def simulator(N, dt, steps, num, fix_u0, num_tau, tau_max_multiplier, include_c1
         seed=seed,
         num_tau=num_tau,
         tau_max_multiplier=tau_max_multiplier,
-        include_c12=include_c12,
+        renormalization=renormalization,
     )
     pre = spde.precompute()
 
@@ -90,10 +98,11 @@ def main(cfg: DictConfig):
 
     x, y, z, t, w, sol, spde, pre = simulator(**cfg.sim, seed=cfg.seed)
 
-    os.makedirs(cfg.save_dir, exist_ok=True)
+    save_dir = resolve_save_dir(cfg.save_dir)
+    os.makedirs(save_dir, exist_ok=True)
     ic_type = "xi" if cfg.sim.fix_u0 else "u0_xi"
     filename = f"{cfg.save_name}_{ic_type}_N{cfg.sim.N}_steps{cfg.sim.steps}_{cfg.sim.num}.mat"
-    save_path = os.path.join(cfg.save_dir, filename)
+    save_path = osp.join(save_dir, filename)
 
     mdict = build_save_dict(
         x=x,

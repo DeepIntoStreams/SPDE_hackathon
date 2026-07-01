@@ -22,7 +22,14 @@ def smooth_corr( modes, lengths, r):
     return (j // 2 + 1) ** (-r)
 
 def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
-    noise = NoiseND()
+    noise = (
+        NoiseND(
+            covariance="q_wiener",
+            q_spectrum=lambda modes, lengths: q_spectrum(modes, lengths, 5.001),
+        )
+        if noise_type == "Q"
+        else NoiseND(covariance="cylindrical")
+    )
     dx, dt = (b-a)/Nx, (t-s)/Nt  # space-time increments
     O_X = noise.partition_axis(a, b, dx)
     O_T = noise.partition_axis(s, t, dt)
@@ -45,7 +52,6 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
             s, t, dt * 0.1,
             bounds=((a, b),),
             steps=(dx,),
-            num=num,
             truncation=(truncation + 1,),
         )
         W_smooth = W_smooth[:, ::10, :]
@@ -56,8 +62,8 @@ def simulator(a, b, Nx, s, t, Nt, noise_type, sigma, truncation, fix_u0, num):
             dt,
             bounds=((a, b),),
             steps=(dx,),
-            num=num,
             truncation=(truncation + 1,),
+            num=num,
         )
     else:
         print('Invalid noise type!')

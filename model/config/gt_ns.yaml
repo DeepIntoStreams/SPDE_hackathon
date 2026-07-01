@@ -1,0 +1,38 @@
+# Galerkin Transformer — config for 2D NSE
+# Mirrors the structure of fno_ns.yaml and nspde_ns.yaml
+
+model: GalerkinTransformer
+equation: NSE
+data: NSE_Q_xi_trc128_1200
+
+data_path: '../../data_gen/results/${equation}/${data}.mat'
+dim_x: 16
+dim_y: 16
+T: 101
+sub_t: 10
+sub_x: 4
+task: xi
+
+d_model: 64
+n_head: 4
+n_layers: 4
+dim_feedforward: 256
+dropout: 0.0
+
+ntrain: 840
+nval: 180
+ntest: 180
+batch_size: 20
+epochs: 1000
+learning_rate: 0.001
+weight_decay: 1e-6
+plateau_patience: 35
+delta: 0.0001
+plateau_terminate: 100
+
+print_every: 100
+seed: 3407
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'
+log_file: '${data}_log'

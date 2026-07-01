@@ -20,7 +20,7 @@ def simulator(a, b, Nx, s, t, Nt, truncation, fix_u0, num):
     ic = lambda x: np.sin(2 * np.pi * x)  # initial condition (fixed part)
     if not fix_u0:  # varying initial condition
         X_ = np.linspace(-0.5,0.5,Nx+1)
-        ic_ = noise.initial(num, (X_,), scaling=1)[:, :]
+        ic_ = noise.initial(num, (X_,))[:, :]
         ic = (ic_-ic_[:,0,None]) + ic(O_X)
         print("u0 is varying!")
     else:
@@ -30,14 +30,14 @@ def simulator(a, b, Nx, s, t, Nt, truncation, fix_u0, num):
     mu = lambda x: np.cos(np.pi * x) + x ** 2  # drift
     sigma = lambda x: x  # diffusion
 
-    W = noise.WN_space_time_many(
+    W = noise.WN_space_time(
         s,
         t,
         dt,
         bounds=((a, b),),
         steps=(dx,),
-        num=num,
         truncation=(truncation + 1,),
+        num=num,
     )
     Wave_soln = SPDE(Type='W', BC='P', T=O_T, X=O_X, IC=ic, IC_t=ic_t, mu=mu, sigma=sigma).Wave(W)  # solve wave equation
 
