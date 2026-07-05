@@ -1,201 +1,419 @@
-import torch
-import torch.optim as optim
-import scipy.io
-import random
-import hydra
-from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from tqdm.notebook import tqdm
-from timeit import default_timer
+"""Train or evaluate the 2D NSPDE-S model on mixed-eps Phi42+ data with a_eps input.
+
+Usage: python model/NSPDE/train2d_alleps.py mode=train_1200 to train on mixed 1200-sample data.
+Usage: python model/NSPDE/train2d_alleps.py mode=eval_mean_std to test a checkpoint on five splits.
+"""
+
 import os
 import os.path as osp
+import random
+import statistics
 import sys
-from model.NSPDE.neural_aeps_spde import *
-from model.NSPDE.utilities_aeps import *
-from model.NSPDE.SPDEs2D import SPDE2D
-import warnings
-warnings.filterwarnings('ignore')
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+import hydra
+import numpy as np
+import torch
+import wandb
+from omegaconf import DictConfig, OmegaConf
 
-def run_training(data_path_2, data_path_8, data_path_32, data_path_64, data_path_128, ntrain, ntest, batch_size, sub_x, T, sub_t,
-                 hidden_channels, n_iter, modes1, modes2, solver,
-                 epochs, learning_rate, scheduler_step, scheduler_gamma,
-                 print_every, save_path):
+current_directory = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(osp.join(current_directory, "..", ".."))
 
-    # Load data
-    data_2 = scipy.io.loadmat(data_path_2)
-    data_8 = scipy.io.loadmat(data_path_8)
-    data_32 = scipy.io.loadmat(data_path_32)
-    data_64 = scipy.io.loadmat(data_path_64)
-    data_128 = scipy.io.loadmat(data_path_128)
+from model.NSPDE.data_io import (
+    build_sequential_refs,
+    cached_loader,
+    create_cache_from_refs,
+    default_cache_path,
+    infer_phi42_eps,
+    resolve_dataset_path,
+    shuffled_alleps_refs,
+    split_train_val_test_refs,
+    validate_full_batches,
+)
+from model.NSPDE.neural_aeps_spde import NeuralSPDE
+from model.NSPDE.utilities_aeps import LpLoss, eval_nspde, train_nspde
+from model.utilities import count_params
 
-    O_X, O_Y, O_T, W_2, Sol_2=data_2['X'].squeeze(), data_2['Y'].squeeze(), data_2['T'].squeeze(), data_2['W'][:240,:,:,:], data_2['sol'][:240,:,:,:]
-    X_2 = SPDE2D().FT_solver(W_2, O_T, O_X, O_Y)
-    a_2 = SPDE2D().MC(X_2)
-    a_2 = torch.from_numpy(a_2).unsqueeze(0).repeat(240, 1, 1, 1)
-    
-    W_8, Sol_8=data_8['W'][:240,:,:,:], data_8['sol'][:240,:,:,:]
-    X_8 = SPDE2D().FT_solver(W_8, O_T, O_X, O_Y)
-    a_8 = SPDE2D().MC(X_8)
-    a_8 = torch.from_numpy(a_8).unsqueeze(0).repeat(240, 1, 1, 1)
 
-    W_32, Sol_32=data_32['W'][:240,:,:,:], data_32['sol'][:240,:,:,:]
-    X_32 = SPDE2D().FT_solver(W_32, O_T, O_X, O_Y)
-    a_32 = SPDE2D().MC(X_32)
-    a_32 = torch.from_numpy(a_32).unsqueeze(0).repeat(240, 1, 1, 1)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    W_64, Sol_64=data_64['W'][:240,:,:,:], data_64['sol'][:240,:,:,:]
-    X_64 = SPDE2D().FT_solver(W_64, O_T, O_X, O_Y)
-    a_64 = SPDE2D().MC(X_64)
-    a_64 = torch.from_numpy(a_64).unsqueeze(0).repeat(240, 1, 1, 1)
 
-    W_128, Sol_128=data_128['W'][:240,:,:,:], data_128['sol'][:240,:,:,:]
-    X_128 = SPDE2D().FT_solver(W_128, O_T, O_X, O_Y)
-    a_128 = SPDE2D().MC(X_128)
-    a_128 = torch.from_numpy(a_128).unsqueeze(0).repeat(240, 1, 1, 1)
+def _mode(config):
+    return str(getattr(config, "mode", "train_1200"))
 
-    Sols = [Sol_2, Sol_8, Sol_32, Sol_64, Sol_128]
-    Sol = np.concatenate(Sols, axis=0)
 
-    Ws = [W_2, W_8, W_32, W_64, W_128]
-    W = np.concatenate(Ws, axis=0)
+def _cache_dir(config):
+    return getattr(config, "cache_dir", None) or osp.join(config.save_dir, "cache")
 
-    aepss = [a_2, a_8, a_32, a_64, a_128]
-    aeps = torch.cat(aepss, dim=0)
 
-    xi = torch.from_numpy(W.astype(np.float32))
-    u = torch.from_numpy(Sol.astype(np.float32))
+def _configured_dataset_path(config, name):
+    root = getattr(config, "data_root", None)
+    if root and not osp.isabs(str(name)):
+        return resolve_dataset_path(osp.join(str(root), str(name)))
+    return resolve_dataset_path(name)
 
-    n_samples = u.size(0)
-    perm = torch.randperm(n_samples)
-    shuffled_u = u[perm,...]
-    shuffled_aeps = aeps[perm,...]
-    shuffled_xi = xi[perm,...]
- 
-    u = shuffled_u[:1200,...]
-    xi = shuffled_xi[:1200,...]
-    aeps = shuffled_aeps[:1200,...]
 
-    train_loader, test_loader = dataloader_nspde_2d(u=u, xi=xi, a_eps=aeps, ntrain=ntrain,
-                                                    ntest=ntest, T=T, sub_t=sub_t, sub_x=sub_x,
-                                                    batch_size=batch_size)
+def _eps_paths(config):
+    datasets = getattr(config, "datasets", None)
+    if datasets:
+        paths_by_eps = [
+            (infer_phi42_eps(dataset), _configured_dataset_path(config, dataset))
+            for dataset in datasets
+        ]
+        if len(paths_by_eps) != 5:
+            raise ValueError("train2d_alleps.py expects exactly five eps datasets.")
+        return sorted(paths_by_eps, key=lambda item: item[0])
 
-    # Define the model.
-    model = NeuralSPDE(dim=2, in_channels=1, noise_channels=1, hidden_channels=hidden_channels,
-                       n_iter=n_iter, modes1=modes1, modes2=modes2, solver=solver).cuda()
+    return [
+        (2, _configured_dataset_path(config, config.data2)),
+        (8, _configured_dataset_path(config, config.data8)),
+        (32, _configured_dataset_path(config, config.data32)),
+        (64, _configured_dataset_path(config, config.data64)),
+        (128, _configured_dataset_path(config, config.data128)),
+    ]
 
-    print('The model has {} parameters'.format(count_params(model)))
 
-    # Train the model.
+def _init_wandb(config, suffix):
+    if wandb.run is not None:
+        return
+    project_name = (
+        "NSPDE-S_refined"
+        + str(config.equation).lower().replace("+", "").replace(" ", "").replace("-", "_")
+    )
+    wandb.init(
+        entity="SPDE_hackathon",
+        project=project_name,
+        config=OmegaConf.to_container(config, resolve=True),
+        name=f"{suffix} mixed trc",
+    )
+    wandb.define_metric("epoch")
+    wandb.define_metric("train_loss", step_metric="epoch")
+    wandb.define_metric("val_loss", step_metric="epoch")
+
+
+def _wandb_update_config(values):
+    if wandb.run is not None:
+        wandb.config.update(values, allow_val_change=True)
+
+
+def _wandb_log_event(values):
+    if wandb.run is not None:
+        wandb.log(values)
+
+
+def _log_training_loss_plots(losses_train, losses_val, print_every):
+    if wandb.run is None:
+        return
+    if not losses_train or not losses_val:
+        return
+
+    count = min(len(losses_train), len(losses_val))
+    epochs = [index * int(print_every) for index in range(count)]
+    train_values = [float(value) for value in losses_train[:count]]
+    val_values = [float(value) for value in losses_val[:count]]
+
+    table = wandb.Table(columns=["epoch", "train_loss", "val_loss"])
+    for epoch, train_loss, val_loss in zip(epochs, train_values, val_values):
+        table.add_data(epoch, train_loss, val_loss)
+
+    wandb.log(
+        {
+            "loss_curve_table": table,
+            "train_val_loss_curve": wandb.plot.line_series(
+                xs=epochs,
+                ys=[train_values, val_values],
+                keys=["train_loss", "val_loss"],
+                title="Train and Validation Loss",
+                xname="epoch",
+            ),
+        }
+    )
+
+
+def _log_final_loss_plot(loss_train, loss_val, loss_test):
+    if wandb.run is None:
+        return
+    table = wandb.Table(columns=["metric", "loss"])
+    rows = [
+        ("train_loss", float(loss_train)),
+        ("val_loss", float(loss_val)),
+        ("test_loss", float(loss_test)),
+    ]
+    for metric, value in rows:
+        table.add_data(metric, value)
+
+    wandb.log(
+        {
+            "final_train_loss": float(loss_train),
+            "final_val_loss": float(loss_val),
+            "final_test_loss": float(loss_test),
+            "final_loss_table": table,
+            "final_loss_bar": wandb.plot.bar(
+                table,
+                "metric",
+                "loss",
+                title="Final Train / Val / Test Loss",
+            ),
+        }
+    )
+
+
+def _log_eval_mean_std_plot(split_losses, mean_loss, std_loss):
+    if wandb.run is None:
+        return
+    table = wandb.Table(columns=["split", "test_loss"])
+    for split, value in split_losses:
+        table.add_data(split, float(value))
+
+    wandb.log(
+        {
+            "mean_test_loss": float(mean_loss),
+            "std_test_loss": float(std_loss),
+            "eval_split_loss_table": table,
+            "eval_split_loss_bar": wandb.plot.bar(
+                table,
+                "split",
+                "test_loss",
+                title="5 Split Test Loss",
+            ),
+        }
+    )
+
+
+def _build_model(config):
+    model = NeuralSPDE(
+        dim=2,
+        in_channels=1,
+        noise_channels=1,
+        hidden_channels=config.hidden_channels,
+        n_iter=config.n_iter,
+        modes1=config.modes1,
+        modes2=config.modes2,
+        modes3=config.modes3,
+        solver=config.solver,
+    ).cuda()
+    print("The model has {} parameters".format(count_params(model)))
+    return model
+
+
+def _make_cache_loaders(config, split_refs, label, source_paths, shuffle_train=False):
+    validate_full_batches(split_refs, config.batch_size)
+    cache_path = default_cache_path(
+        _cache_dir(config),
+        label,
+        source_paths,
+        T=config.T,
+        sub_t=config.sub_t,
+        sub_x=config.sub_x,
+        batch_size=config.batch_size,
+        splits=",".join(split_refs.keys()),
+        counts=",".join(str(len(refs)) for refs in split_refs.values()),
+        seed=getattr(config, "seed", 0),
+    )
+    _wandb_update_config(
+        {
+            "cache_path": cache_path,
+            "cache_label": label,
+            "cache_source_paths": list(source_paths),
+            "cache_split_sizes": {split: len(refs) for split, refs in split_refs.items()},
+            "cache_includes_a_eps": True,
+        }
+    )
+    _wandb_log_event({"stage/cache_create_start": 1})
+    create_cache_from_refs(
+        cache_path,
+        split_refs,
+        T=config.T,
+        sub_t=config.sub_t,
+        sub_x=config.sub_x,
+        include_a_eps=True,
+    )
+    _wandb_log_event({"stage/cache_create_done": 1})
+    keys = ("u0", "xi", "u", "a_eps")
+    loaders = {
+        split: cached_loader(
+            cache_path,
+            split,
+            keys,
+            config.batch_size,
+            shuffle=(shuffle_train and split == "train"),
+        )
+        for split in split_refs
+    }
+    return loaders, cache_path
+
+
+def _training_refs(config):
+    if getattr(config, "data_path", None):
+        data_path = resolve_dataset_path(config.data_path)
+        refs = build_sequential_refs(data_path, count=1200, equation="Phi42+")
+        return refs, [data_path]
+
+    paths_by_eps = _eps_paths(config)
+    refs = shuffled_alleps_refs(
+        paths_by_eps,
+        samples_per_eps=240,
+        sample_size=1200,
+        seed=config.seed,
+    )
+    return refs, [path for _, path in paths_by_eps]
+
+
+def _eval_split_refs(config):
+    samples_per_split = int(getattr(config, "eval_samples_per_split", 500))
+    eval_data_path = getattr(config, "eval_data_path", None) or getattr(config, "data_path", None)
+    if eval_data_path:
+        data_path = resolve_dataset_path(eval_data_path)
+        refs = build_sequential_refs(
+            data_path,
+            count=5 * samples_per_split,
+            equation="Phi42+",
+        )
+        return (
+            {
+                f"test{index + 1}": refs[
+                    index * samples_per_split : (index + 1) * samples_per_split
+                ]
+                for index in range(5)
+            },
+            [data_path],
+        )
+
+    paths_by_eps = _eps_paths(config)
+    split_refs = {
+        f"test{index + 1}": build_sequential_refs(
+            path,
+            count=samples_per_split,
+            equation="Phi42+",
+            eps=eps,
+            start=0,
+        )
+        for index, (eps, path) in enumerate(paths_by_eps)
+    }
+    return split_refs, [path for _, path in paths_by_eps]
+
+
+def train_on_1200(config):
+    _init_wandb(config, "train")
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = osp.join(config.save_dir, config.checkpoint_file)
+    ntrain, nval, ntest = config.ntrain, config.nval, config.ntest
+    _wandb_update_config(
+        {
+            "checkpoint_file": checkpoint_file,
+            "run_mode": "train_1200",
+            "aeps_model_input": True,
+        }
+    )
+    _wandb_log_event({"stage/run_start": 1})
+
+    refs, source_paths = _training_refs(config)
+    split_refs = split_train_val_test_refs(refs, ntrain=ntrain, nval=nval, ntest=ntest)
+    loaders, cache_path = _make_cache_loaders(
+        config,
+        split_refs,
+        label="nspde_alleps_train_1200",
+        source_paths=source_paths,
+        shuffle_train=True,
+    )
+    _wandb_log_event({"stage/loaders_ready": 1, "cache_file_size_mb": os.path.getsize(cache_path) / (1024 ** 2)})
+
+    model = _build_model(config)
+    wandb.watch(model, log="gradients", log_freq=max(int(config.print_every), 1))
     loss = LpLoss(size_average=False)
-    model, losses_train, losses_test = train_nspde(model, train_loader, test_loader, device, loss,
-                                                   batch_size=batch_size, epochs=epochs,
-                                                   learning_rate=learning_rate, scheduler_step=scheduler_step,
-                                                   scheduler_gamma=scheduler_gamma, print_every=print_every)
+    _wandb_log_event({"stage/training_start": 1})
 
-    torch.save(model.state_dict(), save_path)
+    model, losses_train, losses_val = train_nspde(
+        model,
+        loaders["train"],
+        loaders["val"],
+        device,
+        loss,
+        batch_size=config.batch_size,
+        epochs=config.epochs,
+        learning_rate=config.learning_rate,
+        weight_decay=config.weight_decay,
+        plateau_patience=config.plateau_patience,
+        plateau_terminate=config.plateau_terminate,
+        delta=config.delta,
+        print_every=config.print_every,
+        checkpoint_file=checkpoint_file,
+    )
+    _wandb_log_event({"stage/training_done": 1})
+    _log_training_loss_plots(losses_train, losses_val, config.print_every)
 
-    plt.plot(np.arange(1, len(losses_train) * 5, 5), losses_train, label='train')
-    plt.plot(np.arange(1, len(losses_test) * 5, 5), losses_test, label='test')
-    plt.xlabel('Epoch')
-    plt.ylabel('Relative L2 loss')
-    plt.legend()
-    plt.show()
-
-
-def hyperparameter_tuning(data_test_path, data_path_2, data_path_8, data_path_32, data_path_64, data_path_128, ntrain, nval, ntest, batch_size, epochs, learning_rate,
-                 plateau_patience, plateau_terminate, print_every,
-                 sub_x, T, sub_t,
-                 hidden_channels, n_iter, modes1, modes2, solver,
-                 log_file, checkpoint_file, final_checkpoint_file):
-    # Load data
-    data_2 = scipy.io.loadmat(data_path_2)
-    data_8 = scipy.io.loadmat(data_path_8)
-    data_32 = scipy.io.loadmat(data_path_32)
-    data_64 = scipy.io.loadmat(data_path_64)
-    data_128 = scipy.io.loadmat(data_path_128)
-    data_test = scipy.io.loadmat(data_test_path)
-
-    O_X, O_Y, O_T, W_2, Sol_2=data_2['X'].squeeze(), data_2['Y'].squeeze(), data_2['T'].squeeze(), data_2['W'][:240,:,:,:], data_2['sol'][:240,:,:,:]
-    X_2 = SPDE2D().FT_solver(W_2, O_T, O_X, O_Y)
-    a_2 = SPDE2D().MC(X_2)
-    a_2 = torch.from_numpy(a_2).unsqueeze(0).repeat(240, 1, 1, 1)
-    
-    W_8, Sol_8=data_8['W'][:240,:,:,:], data_8['sol'][:240,:,:,:]
-    X_8 = SPDE2D().FT_solver(W_8, O_T, O_X, O_Y)
-    a_8 = SPDE2D().MC(X_8)
-    a_8 = torch.from_numpy(a_8).unsqueeze(0).repeat(240, 1, 1, 1)
-
-    W_32, Sol_32=data_32['W'][:240,:,:,:], data_32['sol'][:240,:,:,:]
-    X_32 = SPDE2D().FT_solver(W_32, O_T, O_X, O_Y)
-    a_32 = SPDE2D().MC(X_32)
-    a_32 = torch.from_numpy(a_32).unsqueeze(0).repeat(240, 1, 1, 1)
-
-    W_64, Sol_64=data_64['W'][:240,:,:,:], data_64['sol'][:240,:,:,:]
-    X_64 = SPDE2D().FT_solver(W_64, O_T, O_X, O_Y)
-    a_64 = SPDE2D().MC(X_64)
-    a_64 = torch.from_numpy(a_64).unsqueeze(0).repeat(240, 1, 1, 1)
-
-    W_128, Sol_128=data_128['W'][:240,:,:,:], data_128['sol'][:240,:,:,:]
-    X_128 = SPDE2D().FT_solver(W_128, O_T, O_X, O_Y)
-    a_128 = SPDE2D().MC(X_128)
-    a_128 = torch.from_numpy(a_128).unsqueeze(0).repeat(240, 1, 1, 1)
-
-    Sols = [Sol_2, Sol_8, Sol_32, Sol_64, Sol_128]
-    Sol = np.concatenate(Sols, axis=0)
-
-    Ws = [W_2, W_8, W_32, W_64, W_128]
-    W = np.concatenate(Ws, axis=0)
-
-    aepss = [a_2, a_8, a_32, a_64, a_128]
-    aeps = torch.cat(aepss, dim=0)
-
-    xi = torch.from_numpy(W.astype(np.float32))
-    u = torch.from_numpy(Sol.astype(np.float32))
-
-    W_test, Sol_test = data_test['W'], data_test['sol']
-    X_test = SPDE2D().FT_solver(W_test, O_T, O_X, O_Y)
-    a_test = SPDE2D().MC(X_test)
-    a_test = torch.from_numpy(a_test).unsqueeze(0).repeat(1200, 1, 1, 1)
-    
-    xi_test = torch.from_numpy(W_test.astype(np.float32))
-    data_test = torch.from_numpy(Sol_test.astype(np.float32))
-
-    #shuffle
-    n_samples = u.size(0)
-    perm = torch.randperm(n_samples)
-    shuffled_u = u[perm,...]
-    shuffled_aeps = aeps[perm,...]
-    shuffled_xi = xi[perm,...]
- 
-    u = shuffled_u[:1200,...]
-    xi = shuffled_xi[:1200,...]
-    aeps = shuffled_aeps[:1200,...]
-
-    _, test_dl = dataloader_nspde_2d(u=data_test, xi=xi_test, a_eps=a_test, ntrain=ntrain+nval,
-                                         ntest=ntest, T=T, sub_t=sub_t, sub_x=sub_x,
-                                         batch_size=batch_size)
-
-    train_dl, val_dl = dataloader_nspde_2d(u=u[:ntrain + nval], xi=xi[:ntrain + nval], a_eps=aeps[:ntrain + nval],
-                                                   ntrain=ntrain, ntest=nval, T=T, sub_t=sub_t, sub_x=sub_x,
-                                                   batch_size=batch_size)
-
-    hyperparameter_search_nspde_2d(train_dl, val_dl, test_dl, solver=solver,
-                                   d_h=hidden_channels, iter=n_iter, modes1=modes1, modes2=modes2,
-                                   epochs=epochs, print_every=print_every, lr=learning_rate,
-                                   plateau_patience=plateau_patience, plateau_terminate=plateau_terminate,
-                                   log_file=log_file + '.csv', checkpoint_file=checkpoint_file,
-                                   final_checkpoint_file=final_checkpoint_file)
+    model.load_state_dict(torch.load(checkpoint_file))
+    _wandb_log_event({"stage/final_eval_start": 1})
+    loss_train = eval_nspde(model, loaders["train"], loss, config.batch_size, device)
+    loss_val = eval_nspde(model, loaders["val"], loss, config.batch_size, device)
+    loss_test = eval_nspde(model, loaders["test"], loss, config.batch_size, device)
+    print("loss_train (model saved in checkpoint):", loss_train)
+    print("loss_val (model saved in checkpoint):", loss_val)
+    print("loss_test (model saved in checkpoint):", loss_test)
+    _log_final_loss_plot(loss_train, loss_val, loss_test)
+    _wandb_log_event({"stage/run_done": 1})
+    wandb.finish()
 
 
-@hydra.main(version_base=None, config_path="../config/", config_name="nspde_phi42.yaml")
+def eval_mean_std_5x500(config):
+    _init_wandb(config, "eval")
+    os.makedirs(config.save_dir, exist_ok=True)
+    checkpoint_file = osp.join(config.save_dir, config.checkpoint_file)
+    _wandb_update_config(
+        {
+            "checkpoint_file": checkpoint_file,
+            "run_mode": "eval_mean_std",
+            "aeps_model_input": True,
+        }
+    )
+    _wandb_log_event({"stage/run_start": 1})
+
+    split_refs, source_paths = _eval_split_refs(config)
+    loaders, cache_path = _make_cache_loaders(
+        config,
+        split_refs,
+        label="nspde_alleps_eval_5x500",
+        source_paths=source_paths,
+        shuffle_train=False,
+    )
+    _wandb_log_event({"stage/loaders_ready": 1, "cache_file_size_mb": os.path.getsize(cache_path) / (1024 ** 2)})
+
+    model = _build_model(config)
+    wandb.watch(model, log="gradients", log_freq=max(int(getattr(config, "print_every", 20)), 1))
+    loss = LpLoss(size_average=False)
+    model.load_state_dict(torch.load(checkpoint_file))
+    _wandb_log_event({"stage/eval_start": 1})
+
+    split_losses = []
+    for split in ["test1", "test2", "test3", "test4", "test5"]:
+        value = eval_nspde(model, loaders[split], loss, config.batch_size, device)
+        print(f"{split}_loss:", value)
+        split_losses.append((split, value))
+
+    losses = [value for _, value in split_losses]
+    mean_loss = statistics.mean(losses)
+    std_loss = statistics.stdev(losses)
+    print("mean_test_loss:", mean_loss)
+    print("std_test_loss:", std_loss)
+    _log_eval_mean_std_plot(split_losses, mean_loss, std_loss)
+    _wandb_log_event({"stage/run_done": 1})
+    wandb.finish()
+
+
+def run_mode(config):
+    mode = _mode(config)
+    if mode in {"train", "train_1200"}:
+        train_on_1200(config)
+    elif mode in {"eval", "eval_mean_std", "eval_5x500"}:
+        eval_mean_std_5x500(config)
+    else:
+        raise ValueError("mode must be one of train_1200 or eval_mean_std")
+
+
+@hydra.main(version_base=None, config_path="../config/", config_name="nspde_phi42_alleps.yaml")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
-    # Set random seed
     seed = cfg.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -205,9 +423,8 @@ def main(cfg: DictConfig):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    run_training(**cfg.args)
-    # hyperparameter_tuning(**cfg.tuning)
+    run_mode(cfg)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

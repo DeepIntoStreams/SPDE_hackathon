@@ -1,0 +1,56 @@
+model: NSPDE-S
+equation: Phi42+
+mode: train_1200 # train_1200 or eval_mean_std
+eval_samples_per_split: 500 # eval_mean_std needs eval_data_path/data_path or five eps files
+seed: 3407
+
+ntrain: 840
+ntest: 180
+nval: 180
+sub_x: 1
+batch_size: 10
+T: 1000
+sub_t: 5
+hidden_channels: 32  # d_h
+n_iter: 1  # [1, 2, 3, 4]
+modes1: 16  # [8, 16]
+modes2: 16  # [8, 16]
+modes3: 8  # [8, 16]
+solver: 'fixed_point'
+epochs: 1000
+learning_rate: 0.001
+weight_decay: 1e-4
+# scheduler_step: 100
+# scheduler_gamma: 0.5
+plateau_patience: 50
+delta: 0.0002
+plateau_terminate: 100
+print_every: 20  # 10
+
+save_dir: '../result/${model}_${equation}/'
+checkpoint_file: '${data}.pth'
+
+log_file: '${data}_log'
+
+# For mode=train_1200, leave data_path null to build the mixed 1200 set
+# from the five eps files below. If you already merged a mixed h5 file,
+# set data_path to that file and it will be used directly.
+data_root: /root/autodl-tmp/results/Phi42+
+data: Phi42+_reno_xi_u0_epsmixed_1200
+data_path: /root/autodl-tmp/results/Phi42+/Phi42+_reno_xi_u0_epsmixed_1200.h5
+
+# Optional path for mode=eval_mean_std. It must contain at least
+# 5 * eval_samples_per_split samples. If null, eval_mean_std uses the first
+# eval_samples_per_split samples from each of the five eps files below.
+eval_data_path: /root/autodl-tmp/results/Phi42+/Phi42+_xi_u0_eps2_sigma0.1_seed42_1200.h5
+datasets: null
+
+data2: 'Phi42+_xi_u0_eps2_sigma0.1_seed42_1200.h5'
+data8: 'Phi42+_xi_u0_eps8_sigma0.1_seed42_1200.h5'
+data32: 'Phi42+_xi_u0_eps32_sigma0.1_seed42_1200.h5'
+data64: 'Phi42+_xi_u0_eps64_sigma0.1_seed42_1200.h5'
+data128: 'Phi42+_xi_u0_eps128_sigma0.1_seed42_1200.h5'
+
+
+
+
