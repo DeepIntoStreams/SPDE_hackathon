@@ -85,7 +85,7 @@ def mat2data(reader, sub_t, sub_x):
     data['Solution'] = reader.read_field('sol')
     data['W'] = reader.read_field('forcing')
     spoints = np.linspace(0, 1, data['W'].shape[1] // sub_x)
-    data['Y'], data['X'] = np.meshgrid(spoints, spoints)
+    data['Y'], data['X'] = np.meshgrid(spoints, spoints, indexing="xy")
     return data
 
 class MatReader(object):
@@ -238,7 +238,7 @@ class rsnet_2d(nn.Module):
     def __init__(self, graph, T, X, Y, nu):
         super().__init__()
         self.graph = graph
-        self.vkeys = [key for key in graph.keys() if key[-1] is ']']
+        self.vkeys = [key for key in graph.keys() if key[-1] == ']']
         self.F = len(self.vkeys)
         self.FU0 = len([key for key in self.vkeys if 'u_0' in key])
         self.T = len(T)

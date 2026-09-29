@@ -21,7 +21,7 @@ def get_twod_bj(dtref,J,a,alpha,device):
     """
     lambdax = 2 * np.pi * torch.cat([torch.arange(0,J[0]//2 +1,device=device), torch.arange(- J[0]//2 + 1,0,device=device)]) / a[0]
     lambday = 2 * np.pi * torch.cat([torch.arange(0,J[1]//2 +1,device=device), torch.arange(- J[1]//2 + 1,0,device=device)]) / a[1]
-    lambdaxx, lambdayy = torch.meshgrid(lambdax,lambday)
+    lambdaxx, lambdayy = torch.meshgrid(lambdax, lambday, indexing="ij")
     root_qj = torch.exp(- alpha * (lambdaxx ** 2 + lambdayy ** 2) / 2)
     bj = root_qj * np.sqrt(dtref) * J[0] * J[1] / np.sqrt(a[0] * a[1])
     return bj

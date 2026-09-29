@@ -96,7 +96,7 @@ def list_metrics():
 
 
 def load_predictions(filepath):
-    data = torch.load(filepath, map_location='cpu')
+    data = torch.load(filepath, map_location='cpu', weights_only=True)
     assert 'u_real' in data and 'u_pred' in data, \
         f"{filepath} must contain 'u_real' and 'u_pred' keys"
     return data['u_real'], data['u_pred']

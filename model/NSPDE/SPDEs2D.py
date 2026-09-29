@@ -29,7 +29,7 @@ class SPDE2D():
         return np.vectorize(f)(vec)
 
     def vectorized_2d(self, f, vec1, vec2):  # vectorises non-linearity and applies it to a certain vector
-        v1, v2 = np.meshgrid(vec1, vec2)
+        v1, v2 = np.meshgrid(vec1, vec2, indexing="xy")
         if f is None:
             return 0
         if type(f) in {float, int}:
