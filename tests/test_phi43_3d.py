@@ -32,8 +32,8 @@ def _laplacian_symbol_from_mode_numbers_np(kx, ky, kz, eps):
 
 def _linear_convolution_3d(a, b):
     out_shape = tuple(np.array(a.shape) + np.array(b.shape) - 1)
-    fa = np.fft.fftn(a, s=out_shape)
-    fb = np.fft.fftn(b, s=out_shape)
+    fa = np.fft.fftn(a, s=out_shape, axes=(0, 1, 2))
+    fb = np.fft.fftn(b, s=out_shape, axes=(0, 1, 2))
     return np.fft.ifftn(fa * fb).real
 
 

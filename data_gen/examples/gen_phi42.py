@@ -36,7 +36,7 @@ def solver(a, b, Nx, c, d, Ny, s, t, Nt, num, eps, sigma, fix_u0):
     )
 
     if not fix_u0: # varying initial condition
-        grid_X, grid_Y = np.meshgrid(O_X, O_Y)
+        grid_X, grid_Y = np.meshgrid(O_X, O_Y, indexing="xy")
         ic_ = 0.1 * noise.initial(num, (O_X, O_Y))
         ic = 0.1*(ic_-ic_[:,0,None,0,None]) + ic(grid_X, grid_Y)
         print("u0 is varying!")
