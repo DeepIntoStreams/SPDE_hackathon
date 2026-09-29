@@ -5,7 +5,7 @@ sim:
   s: 0
   t: 0.5
   Nt: 500
-  truncation: 128  # [32,64,128,256]
+  truncation: 256  # [32,64,128,256]
   fix_u0: True  # [True,False] True--fix; False--vary
   num: 1200
 
