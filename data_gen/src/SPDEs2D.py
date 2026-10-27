@@ -188,6 +188,7 @@ class SPDE2D():
             RHS_noise = self.sigma_(Solution[:,i-1,:,:])*dW[:,i,:,:] if self.sigma_ is not None else dW[:,i,:,:]
             # updating the Fourier transform for the next time step
             w = ( (1-lap_) * w + np.fft.fft2(RHS_noise, axes = [-2,-1]) )/(1+lap_)
+            w[:,0,0] =0.0 #\lambda_0 should be zero. 
             # Going back to the physiscal space
             Solution[:,i,:,:] = np.fft.ifft2(w, axes = [-2,-1]).real
         
@@ -209,32 +210,42 @@ class SPDE2D():
         Nt = X_eps.shape[1]
 
         # Wavenumber grids (non-negative integers only)
+        #kx_vals = np.arange(0, Kx_max + 1)
+       # ky_vals = np.arange(0, Ky_max + 1)
+        #kx_grid, ky_grid = np.meshgrid(kx_vals, ky_vals, indexing='ij')
+        #k_sq = kx_grid**2 + ky_grid**2
+
         kx_vals = np.arange(0, Kx_max + 1)
         ky_vals = np.arange(0, Ky_max + 1)
         kx_grid, ky_grid = np.meshgrid(kx_vals, ky_vals, indexing='ij')
-        k_sq = kx_grid**2 + ky_grid**2
+
 
         # Compute sigma_{kx,ky}^2 for all times
-        with np.errstate(divide='ignore', invalid='ignore'):
-            k_sq_exp = k_sq[..., np.newaxis]
-            T_exp = T[np.newaxis, np.newaxis, :]
-            term = np.where(
-                k_sq_exp == 0,
-                self.sigma ** 2 * T_exp,
-                self.sigma ** 2 / (2.0 * k_sq_exp * 4 * np.pi ** 2) * (1.0 - np.exp(-2.0 * k_sq_exp * 4 * np.pi ** 2 * T_exp))
-            )
+        #with np.errstate(divide='ignore', invalid='ignore'):
+            #k_sq_exp = k_sq[..., np.newaxis]
+            #T_exp = T[np.newaxis, np.newaxis, :]
+            #term = np.where(
+                #k_sq_exp == 0,
+                #self.sigma ** 2 * T_exp,
+                #self.sigma ** 2 / (2.0 * k_sq_exp * 4 * np.pi ** 2) * (1.0 - np.exp(-2.0 * k_sq_exp * 4 * np.pi ** 2 * T_exp))
+            #)
 
         # # New computation with lambda_k = 4*N_x^2*sin^2(pi*k_x/N_x) + 4*N_y^2*sin^2(pi*k_y/N_y)
         # lambda_k = 4.0 * Kx_max**2 * np.sin(np.pi * kx_grid / Kx_max)**2 + 4.0 * Ky_max**2 * np.sin(np.pi * ky_grid / Ky_max)**2
+        
+        lambda_k = (2.0 * Nx**2 * (1 - np.cos(2 * np.pi * kx_grid / Nx))
+                  + 2.0 * Ny**2 * (1 - np.cos(2 * np.pi * ky_grid / Ny)))
+        zero_mode = (kx_grid == 0) & (ky_grid == 0)
 
-        # with np.errstate(divide='ignore', invalid='ignore'):
-        #     lambda_k_exp = lambda_k[..., np.newaxis]
-        #     T_exp = T[np.newaxis, np.newaxis, :]
-        #     term_new = np.where(
-        #         lambda_k_exp == 0,
-        #         self.sigma ** 2 * T_exp,
-        #         self.sigma ** 2 / (2.0 * lambda_k_exp) * (1.0 - np.exp(-2.0 * lambda_k_exp * T_exp))
-        #     )
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+              lambda_k_exp = lambda_k[..., np.newaxis]
+              T_exp = T[np.newaxis, np.newaxis, :]
+              term_new = np.where(
+                  zero_mode[..., np.newaxis],
+                  0.0,
+                  self.sigma ** 2 / (2.0 * lambda_k_exp) * (1.0 - np.exp(-2.0 * lambda_k_exp * T_exp))
+             )
 
         # multiplicities: (0,0)=1, (kx>0,ky=0)=2, (kx=0,ky>0)=2, (kx>0,ky>0)=4
         W = np.ones_like(kx_grid, dtype=float)
@@ -244,9 +255,10 @@ class SPDE2D():
             W[0, 1:] = 2.0
         if Kx_max >= 1:
             W[1:, 0] = 2.0
+        W[0,0] =0.0
 
         # term has shape (Kx+1, Ky+1, Nt); weighted sum over kx,ky -> (Nt,)
-        S = (W[..., None] * term).sum(axis=(0, 1))
+        S = (W[..., None] * term_new).sum(axis=(0, 1))
 
         # Broadcast to (Nt, Nx, Ny)
         a_eps = S[:, None, None] * np.ones((Nt, Nx, Ny))
@@ -297,7 +309,7 @@ class SPDE2D():
         # T(u_{n+1}) = v^3 + 3*v + 3*v^2*X_{\epsilon} + 3*v*:X_{\epsilon}^2: + :X_{\epsilon}^3, where T(u_{n+1}) = u_{n+1} - dt*\Delta*U_{n+1} - dt*U_{n+1}*\Delta, F = U_n + \mu(U_n)*dt + \sigma(U_n)*dW_n
         # Solve equations in paralel for every noise/IC simultaneosly
         for i in tqdm(range(1, len(T))):
-            Solution[:, i, :, :] = self.Renormalization_Time_step(X, Y, dx, dy, dt, Solution[:, i - 1, :, :], i-1) - (3 * Solution[:, i - 1, :, :] ** 2 * X_eps[:, i - 1, :, :] + 3 * Solution[:, i - 1, :, :] * Xsquare[:, i - 1, :, :] + Xcubic[:, i - 1, :, :]) * dt
+            Solution[:, i, :, :] = self.Renormalization_Time_step(X, Y, dx, dy, dt, Solution[:, i - 1, :, :], i-1) - ( + 3 * Solution[:, i - 1, :, :] ** 2 * X_eps[:, i - 1, :, :] + 3 * Solution[:, i - 1, :, :] * Xsquare[:, i - 1, :, :] + Xcubic[:, i - 1, :, :]) * dt
 
         # u = v + X
         Solution += X_eps
