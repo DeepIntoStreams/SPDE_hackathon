@@ -10,8 +10,6 @@ import os.path as osp
 import sys
 current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..", ".."))
-import warnings
-warnings.filterwarnings('ignore')
 
 from model.DLR.utils2d import *
 from model.utilities import EarlyStopping
@@ -125,7 +123,7 @@ def mytrain(config):
                   .format(epoch, trainLoss, valLoss, trainTime / epoch))
 
     ## ----------- test ------------
-    model.load_state_dict(torch.load(checkpoint_file))
+    model.load_state_dict(torch.load(checkpoint_file, weights_only=True))
 
     testLoss = test(model, device, test_loader, lossfn)
 

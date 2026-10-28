@@ -54,7 +54,7 @@ class ParabolicIntegrate(nn.Module):
         self.register_buffer("M_c_PowMat", M_c_PowMat)
 
     def Parabolic_Matrix(self, N, dt, dx, BC, inverse = True):
-        '''
+        r'''
         (N+1)x(N+1) Matrix approximating (Id - eps * \Delta*dt)^{-1}
         'D' corresponds to Dirichlet, 'N' to Neuman, 'P' to periodic BC
         Approximate sceletot of the Laplacian

@@ -373,7 +373,7 @@ def hyperparameter_search_nspde_2d(train_dl, val_dl, test_dl, solver, d_h=[32], 
                               checkpoint_file=checkpoint_file)
 
         # load the best trained model
-        model.load_state_dict(torch.load(checkpoint_file))
+        model.load_state_dict(torch.load(checkpoint_file, weights_only=True))
 
         # compute the test loss
         loss_test = eval_nspde(model, test_dl, loss, 20, device)

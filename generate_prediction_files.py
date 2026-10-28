@@ -98,7 +98,7 @@ def main():
 
     # build model
     model = CONFIGS[args.model]['model_init']().to(args.device)
-    model.load_state_dict(torch.load(args.checkpoint))
+    model.load_state_dict(torch.load(args.checkpoint, weights_only=True))
     model.eval()
 
     for data_path in args.data:

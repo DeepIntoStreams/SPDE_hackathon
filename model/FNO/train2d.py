@@ -11,8 +11,6 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(osp.join(current_directory, "..", ".."))
 from FNO2D import *
 from model.utilities import *
-import warnings
-warnings.filterwarnings('ignore')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -68,7 +66,7 @@ def train(config):
                            print_every=config.print_every,
                            checkpoint_file=checkpoint_file)
 
-    model.load_state_dict(torch.load(checkpoint_file))
+    model.load_state_dict(torch.load(checkpoint_file, weights_only=True))
     loss_train = eval_fno_2d(model, train_loader, loss, config.batch_size, device)
     loss_val = eval_fno_2d(model, val_loader, loss, config.batch_size, device)
     loss_test = eval_fno_2d(model, test_loader, loss, config.batch_size, device)
@@ -146,7 +144,7 @@ def hyperparameter_search(config):
                                print_every=config.print_every,
                                checkpoint_file=tmp_checkpoint_file)
         # load the best trained model
-        model.load_state_dict(torch.load(tmp_checkpoint_file))
+        model.load_state_dict(torch.load(tmp_checkpoint_file, weights_only=True))
         loss_train = eval_fno_2d(model, train_loader, loss, config.batch_size, device)
         loss_val = eval_fno_2d(model, val_loader, loss, config.batch_size, device)
         loss_test = eval_fno_2d(model, test_loader, loss, config.batch_size, device)

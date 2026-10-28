@@ -27,7 +27,7 @@ def simulator(cfg):
     # Forcing function: 0.1*(sin(2pi(x+y)) + cos(2pi(x+y)))
     t = torch.linspace(0, 1, cfg.s + 1)
     t = t[0:-1]
-    X, Y = torch.meshgrid(t, t)
+    X, Y = torch.meshgrid(t, t, indexing="ij")
     f = 0.1 * (torch.sin(2 * math.pi * (X + Y)) + torch.cos(2 * math.pi * (X + Y)))
 
     # Stochastic forcing function: sigma*dW/dt
