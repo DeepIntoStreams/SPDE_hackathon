@@ -112,6 +112,22 @@ SPDE_hackathon
 
 ---
 
+## Citation
+
+SPDEBench was accepted to NeurIPS 2026. If you use this repository, dataset, or benchmark in your work, please cite:
+
+```bibtex
+@inproceedings{2026spdebench,
+  title     = {{SPDEBench}: An Extensive Benchmark for Learning Stochastic PDEs},
+  author    = {Zhu, Yuantu and Li, Zheyan and Shi, Dai and Thompson, Luke and Nash, Oliver and Lara Rangel, Jose Miguel and Li, Siran and Chen, Bingguang and Zhu, Rongchan and Meng, Qi and Ni, Hao},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/2505.18511}
+}
+```
+
+---
+
 ## Acknowledgements 
 This project incorporates code from the following open-source repositories:
 
